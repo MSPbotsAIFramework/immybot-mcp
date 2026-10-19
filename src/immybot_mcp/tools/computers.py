@@ -26,7 +26,7 @@ from ._common import (
     WRITES_IDEMPOTENT,
     ClientFactory,
     ComputerId,
-    Limit,
+    PageLimit,
     OptionalTenantId,
     as_list,
     compact,
@@ -54,7 +54,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         operatingSystem: Annotated[OperatingSystem | None, Field(description="Operating system family.")] = None,
         search: Annotated[str | None, Field(description="Text to match (computer name, user, serial ...).")] = None,
         skip: Annotated[int, Field(description="Records to skip, for paging.", ge=0)] = 0,
-        limit: Limit = DEFAULT,
+        limit: PageLimit = DEFAULT,
     ) -> str:
         """List computers with tenant, online state, OS, model, serial, IPs, primary user and active session."""
 

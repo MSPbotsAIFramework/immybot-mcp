@@ -97,7 +97,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         taskType: Unused = None,
         startDate: Unused = None,
         endDate: Unused = None,
-        limit: Annotated[int, Field(description="Not used.")] = 100,
+        limit: Annotated[int, Field(description="Not used.")] = 50,
     ) -> str:
         """Not available: ImmyBot has no task history. Use immybot_maintenance_sessions_list instead."""
         return unsupported(_FEATURE, f"{_SESSIONS} with computerId / tenantId / startDate / endDate.")

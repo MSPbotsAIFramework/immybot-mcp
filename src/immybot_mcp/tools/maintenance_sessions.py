@@ -193,7 +193,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     @mcp.tool(annotations=READ_ONLY)
     async def immybot_maintenance_sessions_logs(
         sessionId: SessionId,
-        limit: Annotated[int, Field(description="Newest log lines to return.", ge=1, le=1000)] = 200,
+        limit: Annotated[int, Field(description="Newest log lines to return.", ge=1, le=1000)] = 50,
     ) -> str:
         """Get the log lines of a maintenance session (messages, time, action status; script bodies left out)."""
 

@@ -142,6 +142,12 @@ uv run pytest
   parameters whose names look secret (password, secret, token, API key ...) are masked, session
   job arguments are left out of `immybot_maintenance_sessions_get`, and logs omit script bodies
   and parameters.
+- **Result size exception (SOP 2.5).** `immybot_deployments_list`, `immybot_maintenance_sessions_list`,
+  `immybot_scripts_list`, `immybot_software_list_global`, `immybot_software_list`,
+  `immybot_tenants_list` and `immybot_tenants_computers` have no paging in the API, so they keep a
+  maximum of 500; `immybot_maintenance_sessions_logs` keeps a maximum of 1000 log lines. All default
+  to 50, and results are still cut to 20,000 characters with a truncation notice.
+  `immybot_computers_list` pages with `skip` and takes at most 200 per call.
 - **Script runs** are synchronous; the wait is capped at 95 seconds (script `timeout` max 90)
   to stay inside the gateway's tool-call limit.
 

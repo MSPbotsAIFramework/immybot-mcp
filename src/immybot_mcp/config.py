@@ -19,6 +19,7 @@ INSTANCE_DOMAIN = "immy.bot"
 TOKEN_URL = "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 500
+MAX_PAGE_LIMIT = 200
 
 
 class Settings(BaseSettings):

@@ -110,7 +110,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     @mcp.tool(annotations=READ_ONLY)
     async def immybot_tenants_computers(
         tenantId: TenantId,
-        limit: Annotated[int, Field(description="Maximum computers to return.", ge=1, le=500)] = 200,
+        limit: Annotated[int, Field(description="Maximum computers to return.", ge=1, le=500)] = 50,
     ) -> str:
         """List a tenant's computers with online state, OS, model, primary user and active session."""
 

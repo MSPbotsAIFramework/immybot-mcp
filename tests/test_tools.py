@@ -184,6 +184,13 @@ def test_navigate_lists_every_tool():
     assert listed | {"immybot_navigate", "immybot_back", "immybot_status"} == set(EXPECTED_TOOLS)
 
 
+def test_paging_tool_limit_capped_at_200(tools):
+    limit = tools["immybot_computers_list"].inputSchema["properties"]["limit"]
+    assert limit["maximum"] == 200
+    assert limit["default"] == 50
+    assert tools["immybot_scripts_list"].inputSchema["properties"]["limit"]["maximum"] == 500
+
+
 def test_instructions_budget():
     assert len(INSTRUCTIONS) <= 1500
 

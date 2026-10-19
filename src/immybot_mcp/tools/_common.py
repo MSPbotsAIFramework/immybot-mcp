@@ -26,7 +26,7 @@ from pydantic import Field
 
 from .._json import dump_json_capped, error_envelope
 from ..api_client import ImmyBotClient, ImmyBotError
-from ..config import DEFAULT_LIMIT, MAX_LIMIT
+from ..config import DEFAULT_LIMIT, MAX_LIMIT, MAX_PAGE_LIMIT
 
 logger = logging.getLogger("immybot_mcp.tools")
 
@@ -46,6 +46,7 @@ NOT_CONFIGURED = error_envelope(
 )
 
 Limit = Annotated[int, Field(description=f"Maximum records to return (max {MAX_LIMIT}).", ge=1, le=MAX_LIMIT)]
+PageLimit = Annotated[int, Field(description=f"Records per page (max {MAX_PAGE_LIMIT}).", ge=1, le=MAX_PAGE_LIMIT)]
 Confirm = Annotated[bool | None, Field(description="Must be true, set only after the user approved this exact action.")]
 ComputerId = Annotated[int, Field(description="ImmyBot computer id.", ge=1)]
 TenantId = Annotated[int, Field(description="ImmyBot tenant id (not the Entra tenant id).", ge=1)]
