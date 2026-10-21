@@ -80,7 +80,11 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
                 key = {"Windows": "windows", "macOS": "mac", "Linux": "linux"}[operatingSystem]
                 rows = [r for r in rows if key in str(r.get("operatingSystem") or "").lower()]
             more = total is not None and skip + limit < total
-            return listing("computers", rows, limit) | compact({"total": total, "has_more": more, "next_skip": skip + limit if more else None})
+            out = listing("computers", rows, limit) | compact({"total": total, "has_more": more, "next_skip": skip + limit if more else None})
+            if not operatingSystem:
+                # Rows map 1:1 to the API's skip offsets, so the size cap can continue right after the last row it returns.
+                out["_resume"] = {"key": "next_skip", "start": skip}
+            return out
 
         return await run_tool("immybot_computers_list", client_factory, action)
 
