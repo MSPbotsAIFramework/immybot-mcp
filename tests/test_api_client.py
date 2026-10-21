@@ -518,3 +518,10 @@ async def test_tenant_computers_enforces_tenant(monkeypatch):
     rec = Recorder({"computers/paged": {"results": [{"id": 1, "tenantId": 4}, {"id": 2, "tenantId": 6}]}})
     result = await _call(monkeypatch, rec, "immybot_tenants_computers", {"tenantId": 4})
     assert [c["id"] for c in result["computers"]] == [1]
+
+
+@pytest.mark.parametrize("given,sent", [("powershell", "PowerShell"), ("COMMANDLINE", "CommandLine"), ("Python", "Python")])
+async def test_script_validate_language_normalized_or_passed_through(monkeypatch, given, sent):
+    rec = Recorder({"POST scripts/syntax-check": {"isSyntaxValid": True}})
+    await _call(monkeypatch, rec, "immybot_scripts_validate", {"content": "x", "language": given})
+    assert body(rec.requests[0])["scriptLanguage"] == sent

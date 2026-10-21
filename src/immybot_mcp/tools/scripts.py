@@ -34,6 +34,7 @@ from ._common import (
     as_list,
     compact,
     enum_name,
+    enum_value,
     get_from_catalog,
     listing,
     names,
@@ -45,6 +46,7 @@ from ._common import (
 
 ScriptId = Annotated[int, Field(description="Script id.", ge=1)]
 Category = Annotated[str | None, Field(description=f"Script category: {', '.join(SCRIPT_CATEGORY)}.")]
+ValidateLanguage = Literal["PowerShell", "CommandLine"]
 # /scripts/run streams until the script ends; ImmyBot's own gateway stops it near 120s
 # and ours at 120s, so cap the wait below both.
 _RUN_READ_TIMEOUT = 95.0
@@ -180,11 +182,11 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     @mcp.tool(annotations=READ_ONLY)
     async def immybot_scripts_validate(
         content: Annotated[str, Field(description="Script text to check.", min_length=1)],
-        language: Annotated[Literal["PowerShell", "CommandLine"], Field(description="Script language.")] = "PowerShell",
+        language: Annotated[ValidateLanguage | str, Field(description="Script language.")] = "PowerShell",
     ) -> str:
         """Check a script's syntax without running it; returns whether it is valid and the errors."""
 
         async def action(client: ImmyBotClient) -> Any:
-            return await client.post("scripts/syntax-check", {"script": content, "scriptLanguage": language})
+            return await client.post("scripts/syntax-check", {"script": content, "scriptLanguage": enum_value(language, ValidateLanguage)})
 
         return await run_tool("immybot_scripts_validate", client_factory, action)
