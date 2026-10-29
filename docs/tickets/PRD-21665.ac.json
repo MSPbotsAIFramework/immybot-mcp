@@ -1,0 +1,77 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC1",
+    "text": "Given a Recorder stub for scripts/local/1 and POST scripts/run, When immybot_scripts_run(scriptId=1, computerId=1, confirm=true) is called, Then the outbound request body has a top-level body key (not script) containing the script record, and the tool returns done: true with the stubbed output.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"]
+  },
+  {
+    "id": "TC2",
+    "ac": "AC1",
+    "text": "Given SOP 263, computer DEV-W11-01 (computerId=1), stored Local script 1, When an agent calls immybot_scripts_run(scriptId=1, computerId=1, confirm=true) against the live mspbotsai.immy.bot instance, Then the call does not return HTTP 400 and the output contains TEST-VPN-OK DEV-W11-01.",
+    "type": "manual",
+    "steps": [
+      "Obtain ImmyBot credentials for the mspbotsai.immy.bot instance (tenant 1) used in the ticket",
+      "Call immybot_scripts_run with scriptId=1, computerId=1, databaseType=Local, runAs=System, timeout=90, confirm=true",
+      "Inspect the HTTP response/tool result"
+    ],
+    "expect": "No HTTP 400 for a missing body field or an invalid cancellationId; result contains done: true and output includes TEST-VPN-OK DEV-W11-01",
+    "result": "untested",
+    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): record here once run against the live instance; does not block 6b if unavailable"
+  },
+  {
+    "id": "TC3",
+    "ac": "AC2",
+    "text": "Given the same Recorder stub as TC1, When immybot_scripts_run is called first with confirm omitted and then with confirm=true, Then neither the preview dict nor the final result contains the script's action text (only id/name/computer/status/output fields).",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"]
+  },
+  {
+    "id": "TC4",
+    "ac": "AC3",
+    "text": "Given a Recorder stub for scripts/global/<id> (local lookup 404s) and POST scripts/run, When immybot_scripts_run(scriptId=<id>, computerId=<n>, confirm=true, databaseType=Global) is called, Then the request succeeds the same way as the Local case in TC1.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_executes_global_script"]
+  },
+  {
+    "id": "TC5",
+    "ac": "AC4",
+    "text": "Given any valid call with confirm=true, When the outbound request is inspected, Then sent[\"cancellationId\"] parses as a valid UUID and is not of the form mcp-<id>-<id>.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"]
+  },
+  {
+    "id": "TC6",
+    "ac": "AC4",
+    "text": "Given two back-to-back confirmed calls with the same scriptId/computerId, When both outbound requests are inspected, Then their cancellationId values differ.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_cancellation_id_is_unique_per_call"]
+  },
+  {
+    "id": "TC7",
+    "ac": "AC5",
+    "text": "Given the tool's registered description (as returned by tools/list), When it is read, Then it states that immybot_scripts_get is optional for a script id already approved by an administrator or a pre-reviewed workflow, while the confirm: true requirement remains stated.",
+    "type": "manual",
+    "steps": [
+      "Start the server locally (or inspect the docstring of immybot_scripts_run in src/immybot_mcp/tools/scripts.py)",
+      "Call tools/list and read the description for immybot_scripts_run"
+    ],
+    "expect": "Description still requires confirm: true, and additionally states immybot_scripts_get is optional for an already-approved script id",
+    "result": "untested",
+    "evidence": "record the tools/list description text (or the docstring diff) once implemented"
+  },
+  {
+    "id": "TC8",
+    "ac": "AC3",
+    "text": "Given a stored Global script on the live instance, When immybot_scripts_run is called with confirm=true against it, Then it executes successfully (second half of \"Verify Local and Global execution paths\" from the ticket's Requested Acceptance Checks).",
+    "type": "manual",
+    "steps": [
+      "Identify a stored Global script id on the live mspbotsai.immy.bot instance",
+      "Call immybot_scripts_run with that scriptId, a valid computerId, confirm=true"
+    ],
+    "expect": "No HTTP 400; result contains done: true with the script's output",
+    "result": "untested",
+    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): record here once run against the live instance; does not block 6b if unavailable"
+  }
+]
