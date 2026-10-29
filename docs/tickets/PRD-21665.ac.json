@@ -4,7 +4,9 @@
     "ac": "AC1",
     "text": "Given a Recorder stub for scripts/local/1 and POST scripts/run, When immybot_scripts_run(scriptId=1, computerId=1, confirm=true) is called, Then the outbound request body has a top-level body key (not script) containing the script record, and the tool returns done: true with the stubbed output.",
     "type": "auto",
-    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"]
+    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"],
+    "result": "pass",
+    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -> 3 passed, 43 deselected (2026-10-29). Test asserts 'script' not in sent, sent['body']['action'] == SCRIPT['action'], and result['output'] == {'output': 'removed 12 files'}."
   },
   {
     "id": "TC2",
@@ -18,35 +20,43 @@
     ],
     "expect": "No HTTP 400 for a missing body field or an invalid cancellationId; result contains done: true and output includes TEST-VPN-OK DEV-W11-01",
     "result": "untested",
-    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): record here once run against the live instance; does not block 6b if unavailable"
+    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): DEV01 has no mspbotsai.immy.bot credentials in this environment; does not block 6b per mcp-track.md 3 completion criteria"
   },
   {
     "id": "TC3",
     "ac": "AC2",
     "text": "Given the same Recorder stub as TC1, When immybot_scripts_run is called first with confirm omitted and then with confirm=true, Then neither the preview dict nor the final result contains the script's action text (only id/name/computer/status/output fields).",
     "type": "auto",
-    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"]
+    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"],
+    "result": "pass",
+    "evidence": "Same run as TC1. Test asserts SCRIPT['action'] (the real PowerShell source, 'Remove-Item $env:TEMP\\\\* -Recurse') not in json.dumps(preview) and not in json.dumps(result)."
   },
   {
     "id": "TC4",
     "ac": "AC3",
     "text": "Given a Recorder stub for scripts/global/<id> (local lookup 404s) and POST scripts/run, When immybot_scripts_run(scriptId=<id>, computerId=<n>, confirm=true, databaseType=Global) is called, Then the request succeeds the same way as the Local case in TC1.",
     "type": "auto",
-    "tests": ["tests/test_api_client.py::test_script_run_executes_global_script"]
+    "tests": ["tests/test_api_client.py::test_script_run_executes_global_script"],
+    "result": "pass",
+    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -> 3 passed (2026-10-29). New test stubs scripts/local/31 as 404 and scripts/global/31 as the script record; asserts sent['body']['databaseType'] == 'Global', cancellationId is a valid UUID, result['done'] is True."
   },
   {
     "id": "TC5",
     "ac": "AC4",
     "text": "Given any valid call with confirm=true, When the outbound request is inspected, Then sent[\"cancellationId\"] parses as a valid UUID and is not of the form mcp-<id>-<id>.",
     "type": "auto",
-    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"]
+    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"],
+    "result": "pass",
+    "evidence": "Same run as TC1. Test asserts uuid.UUID(sent['cancellationId']) does not raise and sent['cancellationId'] != 'mcp-31-7'."
   },
   {
     "id": "TC6",
     "ac": "AC4",
     "text": "Given two back-to-back confirmed calls with the same scriptId/computerId, When both outbound requests are inspected, Then their cancellationId values differ.",
     "type": "auto",
-    "tests": ["tests/test_api_client.py::test_script_run_cancellation_id_is_unique_per_call"]
+    "tests": ["tests/test_api_client.py::test_script_run_cancellation_id_is_unique_per_call"],
+    "result": "pass",
+    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -> 3 passed (2026-10-29). New test calls immybot_scripts_run twice with the same scriptId=31/computerId=7 and asserts both cancellationId values are valid UUIDs and differ from each other."
   },
   {
     "id": "TC7",
@@ -58,8 +68,8 @@
       "Call tools/list and read the description for immybot_scripts_run"
     ],
     "expect": "Description still requires confirm: true, and additionally states immybot_scripts_get is optional for an already-approved script id",
-    "result": "untested",
-    "evidence": "record the tools/list description text (or the docstring diff) once implemented"
+    "result": "pass",
+    "evidence": "2026-10-29: started `uv run python -m immybot_mcp` locally, called POST /mcp tools/list with placeholder ImmyBot headers. Response tool count = 68 (matches README 'Tool count (68)'). immybot_scripts_run.description = \"Run a saved script on one computer now and return its output. Needs confirm: true.\\n\\n        Executes code on the endpoint. Only when the user explicitly asks; review the script first with\\n        immybot_scripts_get. Reviewing first is optional when the script id was already approved by an\\n        administrator or a pre-reviewed workflow.\\n        \" -- confirm: true requirement unchanged, new optional-review sentence present. Raw response saved at /tmp/tools_list_full.out (not committed, scratch evidence)."
   },
   {
     "id": "TC8",
@@ -72,6 +82,6 @@
     ],
     "expect": "No HTTP 400; result contains done: true with the script's output",
     "result": "untested",
-    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): record here once run against the live instance; does not block 6b if unavailable"
+    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): DEV01 has no mspbotsai.immy.bot credentials in this environment; does not block 6b per mcp-track.md 3 completion criteria. Global-path request shape itself is covered automatically by TC4."
   }
 ]
