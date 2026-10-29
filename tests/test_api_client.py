@@ -14,6 +14,7 @@
 """Token flow, request shapes, retries and tool behaviour against a mocked ImmyBot API."""
 
 import json
+import uuid
 from urllib.parse import parse_qs
 
 import httpx
@@ -402,14 +403,42 @@ async def test_script_run_needs_confirm_and_replays_script(monkeypatch):
     rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(200, text="removed 12 files")})
     preview = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7})
     assert preview["done"] is False and not rec.calls("scripts/run")
+    assert SCRIPT["action"] not in json.dumps(preview)
     result = await _call(
         monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "parameters": {"Days": 3}, "runAs": "User", "confirm": True}
     )
     sent = body(rec.calls("scripts/run", "POST")[0])
     assert sent["computerId"] == 7
-    assert sent["script"]["action"] == SCRIPT["action"] and sent["script"]["parameterOverrides"] == {"Days": 3}
-    assert sent["script"]["scriptExecutionContext"] == "CurrentUser" and sent["script"]["variables"] == {}
+    assert "script" not in sent
+    assert sent["body"]["action"] == SCRIPT["action"] and sent["body"]["parameterOverrides"] == {"Days": 3}
+    assert sent["body"]["scriptExecutionContext"] == "CurrentUser" and sent["body"]["variables"] == {}
+    assert uuid.UUID(sent["cancellationId"]) and sent["cancellationId"] != "mcp-31-7"
     assert result["output"] == {"output": "removed 12 files"}
+    assert SCRIPT["action"] not in json.dumps(result)
+
+
+async def test_script_run_executes_global_script(monkeypatch):
+    rec = Recorder(
+        {
+            "scripts/local/31": lambda r: httpx.Response(404, json={}),
+            "scripts/global/31": SCRIPT | {"databaseType": None},
+            "POST scripts/run": lambda r: httpx.Response(200, text="removed 12 files"),
+        }
+    )
+    result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "databaseType": "Global", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert sent["body"]["databaseType"] == "Global"
+    assert uuid.UUID(sent["cancellationId"])
+    assert result["done"] is True
+
+
+async def test_script_run_cancellation_id_is_unique_per_call(monkeypatch):
+    rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(200, text="ok")})
+    await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "confirm": True})
+    await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "confirm": True})
+    calls = rec.calls("scripts/run", "POST")
+    first, second = body(calls[0])["cancellationId"], body(calls[1])["cancellationId"]
+    assert uuid.UUID(first) and uuid.UUID(second) and first != second
 
 
 async def test_script_validate(monkeypatch):
