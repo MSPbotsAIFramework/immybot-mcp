@@ -1,0 +1,81 @@
+[
+    {
+        "id": "TC1",
+        "ac": "AC1",
+        "text": "Given a Recorder stub for PUT computers/42 returning an updated computer record, When immybot_computers_set_primary_user(computerId=42, primaryPersonId=7) is called, Then the outbound request is a PUT to computers/42 with body {\"primaryPersonId\": 7, \"providerLinkUpdates\": []}, and the tool returns the stubbed updated record (including primaryPersonId: 7).",
+        "type": "auto",
+        "tests": [
+            "tests/test_api_client.py::test_set_primary_user_minimal_body"
+        ]
+    },
+    {
+        "id": "TC2",
+        "ac": "AC2",
+        "text": "Given the same stub, When immybot_computers_set_primary_user(computerId=42, primaryPersonId=7, onboardingStatus=\"Completed\") is called, Then the outbound body includes \"onboardingStatus\": \"Completed\".",
+        "type": "auto",
+        "tests": [
+            "tests/test_api_client.py::test_set_primary_user_includes_onboarding_status"
+        ]
+    },
+    {
+        "id": "TC3",
+        "ac": "AC3",
+        "text": "Given the same stub, When immybot_computers_set_primary_user(computerId=42, primaryPersonId=7, additionalPersonIds=[8, 9]) is called, Then the outbound body includes \"additionalPersonIds\": [8, 9].",
+        "type": "auto",
+        "tests": [
+            "tests/test_api_client.py::test_set_primary_user_includes_additional_person_ids"
+        ]
+    },
+    {
+        "id": "TC4",
+        "ac": "AC4",
+        "text": "Given the same stub, When immybot_computers_set_primary_user(computerId=42, primaryPersonId=7) is called with no optional arguments, Then the outbound body contains exactly primaryPersonId and providerLinkUpdates -- no onboardingStatus or additionalPersonIds key at all.",
+        "type": "auto",
+        "tests": [
+            "tests/test_api_client.py::test_set_primary_user_minimal_body"
+        ]
+    },
+    {
+        "id": "TC5",
+        "ac": "AC5",
+        "text": "Given a Recorder stub for PUT computers/999 returning HTTP 404, When immybot_computers_set_primary_user(computerId=999, primaryPersonId=7) is called, Then the tool returns the structured error envelope with ImmyBot's literal message, and does not raise.",
+        "type": "auto",
+        "tests": [
+            "tests/test_api_client.py::test_set_primary_user_surfaces_vendor_error"
+        ]
+    },
+    {
+        "id": "TC6",
+        "ac": "AC6",
+        "text": "Given the tool's registered description (as returned by tools/list), When it is read, Then it mentions setting the primary user / onboarding status / linked users, states \"only when the user explicitly asks\", and states the caller must already know the person id.",
+        "type": "auto",
+        "tests": [
+            "tests/test_tools.py::test_write_tools_say_when_to_use_them",
+            "tests/test_tools.py::test_description_budget"
+        ]
+    },
+    {
+        "id": "TC7",
+        "ac": "AC7",
+        "text": "Given tools/list's schema for immybot_computers_set_primary_user, When the required-parameters set is inspected, Then it is exactly {\"computerId\", \"primaryPersonId\"} (matches tests/test_tools.py's test_required_params, run via the EXPECTED_TOOLS entry).",
+        "type": "auto",
+        "tests": [
+            "tests/test_tools.py::test_required_params",
+            "tests/test_tools.py::test_tool_names_are_stable"
+        ]
+    },
+    {
+        "id": "TC8",
+        "ac": "AC1",
+        "text": "Given a real ImmyBot tenant, an existing computer id, and a valid person id, When an agent calls immybot_computers_set_primary_user against the live instance, Then the call succeeds and a subsequent immybot_computers_get(computerId) shows the new primaryPersonId.",
+        "type": "manual",
+        "steps": [
+            "Obtain ImmyBot credentials for a real tenant, plus a known computer id and a known valid person id",
+            "Call immybot_computers_set_primary_user(computerId=<id>, primaryPersonId=<id>)",
+            "Call immybot_computers_get(computerId=<id>) and read its primaryPerson/primaryPersonId field"
+        ],
+        "expect": "The set call returns the updated record with the new primaryPersonId and no error; the follow-up get confirms the same primaryPersonId persisted",
+        "result": "untested",
+        "evidence": "needs a real vendor account (mcp-track.md 2.5/3): no ImmyBot tenant/credentials in this design-time environment; does not block 6b per mcp-track.md 3 completion criteria"
+    }
+]
