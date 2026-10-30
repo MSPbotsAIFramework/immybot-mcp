@@ -1,0 +1,66 @@
+[
+  {
+    "id": "TC-ICD-001",
+    "ac": "AC1",
+    "text": "Given computerIds:[123,456] and no confirm, When immybot_computers_delete is called, Then it returns done:false with an action line naming both ids and makes no HTTP call to ImmyBot",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_computers_delete_without_confirm_returns_not_confirmed"]
+  },
+  {
+    "id": "TC-ICD-002",
+    "ac": "AC2",
+    "text": "Given computerIds:[123] and confirm:true against a live ImmyBot tenant, When immybot_computers_delete is called, Then it returns done:true, deleted_count:1 and the computer no longer appears in immybot_computers_get(123)",
+    "type": "manual",
+    "steps": [
+      "Obtain a real ImmyBot test tenant's credentials (X-Immybot-Instance-Subdomain, X-Immybot-Tenant-Id, X-Immybot-Client-Id, X-Immybot-Client-Secret)",
+      "Pick a disposable computer id in that tenant (confirm with immybot_computers_get first)",
+      "Call immybot_computers_delete(computerIds:[<id>], confirm:true)",
+      "Call immybot_computers_get(<id>) again"
+    ],
+    "expect": "First call returns done:true, deleted_count:1; second call returns a not_found error",
+    "result": "blocked",
+    "evidence": "No ImmyBot test account available to DEV01 (references/mcp-track.md §2.5: missing a test account does not block the ticket, the case is deferred to whoever has a real tenant)"
+  },
+  {
+    "id": "TC-ICD-003",
+    "ac": "AC2",
+    "text": "Given computerIds:[123,456] and confirm:true, When immybot_computers_delete is called with a mocked ImmyBotClient.post, Then post is called exactly once with (\"computers/bulk-delete\", {\"ids\": [123, 456]}) and the tool returns done:true, deleted_count:2, computer_ids:[123,456]",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_computers_delete_confirmed_calls_bulk_delete_once"]
+  },
+  {
+    "id": "TC-ICD-004",
+    "ac": "AC3",
+    "text": "Given a mocked ImmyBotClient.post that raises ImmyBotError(404, ...), When immybot_computers_delete is called with confirm:true, Then it returns the structured error envelope {\"error\": {\"code\": \"not_found\", ...}} and does not raise",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_computers_delete_upstream_error_returns_envelope"]
+  },
+  {
+    "id": "TC-ICD-005",
+    "ac": "AC4",
+    "text": "Given computerIds is an empty list, When immybot_computers_delete is called, Then it returns an invalid_argument error and makes no HTTP call",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_computers_delete_empty_ids_rejected"]
+  },
+  {
+    "id": "TC-ICD-006",
+    "ac": "AC6",
+    "text": "Given computerIds has 201 entries (one over the 200-item cap), When immybot_computers_delete is called, Then it returns an invalid_argument error and makes no HTTP call",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_computers_delete_oversized_batch_rejected"]
+  },
+  {
+    "id": "TC-ICD-007",
+    "ac": "AC5",
+    "text": "Given the request is missing the required ImmyBot credential headers (client_factory() returns None), When immybot_computers_delete is called, Then it returns the same not_configured envelope every other tool in this repo returns",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_computers_delete_missing_credentials_returns_not_configured"]
+  },
+  {
+    "id": "TC-ICD-008",
+    "ac": "AC7",
+    "text": "Given a tools/list call, Then immybot_computers_delete is listed with exactly {\"computerIds\"} as its required parameters (no tenantId) and annotation destructiveHint:true",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_required_params[immybot_computers_delete]", "tests/test_tools.py::test_tool_names_are_stable"]
+  }
+]
