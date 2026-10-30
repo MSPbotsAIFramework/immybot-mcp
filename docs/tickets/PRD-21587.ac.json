@@ -1,0 +1,106 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC1",
+    "text": "Given a Recorder stub for POST scripts/run, When immybot_scripts_run_adhoc(computerId=7, content=\"Write-Output 'hi'\", confirm=true) is called, Then the outbound request has body/computerId/cancellationId at the top level (no script key), body.action equals the given content, and the tool returns done: true with the recorder's stubbed output.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_executes_and_returns_output"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC2",
+    "ac": "AC2",
+    "text": "Given a script longer than 200 characters, When immybot_scripts_run_adhoc is called with confirm omitted, Then no request reaches scripts/run, and the preview's excerpt is the first 200 characters of the content followed by '...'.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_preview_truncates_long_excerpt"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC3",
+    "ac": "AC2",
+    "text": "Given a script that is exactly 200 characters, When immybot_scripts_run_adhoc is called with confirm omitted, Then the preview's excerpt is the full content verbatim, with no '...' appended.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_preview_keeps_full_excerpt_at_200_chars"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC4",
+    "ac": "AC3",
+    "text": "Given language=\"CommandLine\", When immybot_scripts_run_adhoc is called confirmed, Then the outbound request's body.scriptLanguage is \"CommandLine\".",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_honors_command_line_language"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC5",
+    "ac": "AC4",
+    "text": "Given any confirmed call, When the outbound request is inspected, Then it has no top-level script key, and cancellationId parses as a valid UUID.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_uses_body_key_and_real_cancellation_id"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC6",
+    "ac": "AC5",
+    "text": "Given empty script content, When immybot_scripts_run_adhoc is called with confirm=true, Then no request reaches scripts/run and the call does not succeed as if it ran.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_rejects_empty_content_without_a_request"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC7",
+    "ac": "AC6",
+    "text": "Given no optional parameters are supplied, When immybot_scripts_run_adhoc is called confirmed, Then the outbound request has outputType=\"Object\", scriptExecutionContext=\"System\", timeout=30, parameterOverrides={}, and name=\"Ad hoc script (MCP)\".",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_defaults"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC8",
+    "ac": "AC6",
+    "text": "Given name, outputType=\"Table\", timeout=60, runAs=\"User\", parameters={\"A\": 1} are all supplied, When immybot_scripts_run_adhoc is called confirmed, Then the outbound request reflects every one of those values, including scriptExecutionContext=\"CurrentUser\".",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_overrides"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC9",
+    "ac": "AC7",
+    "text": "Given a preview call followed by a confirmed call with distinctive script content, When all emitted log records across both calls are inspected, Then the script's full text never appears in any of them.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_never_logs_script_content"],
+    "result": "",
+    "evidence": ""
+  },
+  {
+    "id": "TC10",
+    "ac": "AC1",
+    "text": "Given a real ImmyBot instance and computer, When an agent calls immybot_scripts_run_adhoc with a Ginko-style \"download ScriptURL then iex\" PowerShell body and confirm=true, Then it executes successfully with no HTTP 400 and the output is returned.",
+    "type": "manual",
+    "steps": [
+      "Obtain credentials for a live ImmyBot instance and an online computer id on it",
+      "Call immybot_scripts_run_adhoc with content equal to a short, safe PowerShell probe script, computerId=<id>, confirm=true",
+      "Inspect the HTTP response / tool result"
+    ],
+    "expect": "No HTTP 400 for a missing/unexpected body field or an invalid cancellationId; result contains done: true and the script's actual output",
+    "result": "untested",
+    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): DEV01 has no live ImmyBot credentials in this environment; does not block 6b per mcp-track.md 3 completion criteria"
+  },
+  {
+    "id": "TC11",
+    "ac": "AC4",
+    "text": "Given script content containing single quotes, backticks and embedded newlines, When immybot_scripts_run_adhoc is called confirmed, Then the outbound request's body.action contains that content unmangled (exact string equality).",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_scripts_run_adhoc_preserves_special_characters"],
+    "result": "",
+    "evidence": ""
+  }
+]
