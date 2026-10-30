@@ -1,0 +1,60 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC1",
+    "text": "Given a Recorder stub for Persons/dx returning 2 persons for tenantId=119 with all six fields populated, When immybot_persons_list(tenantId=119) is called, Then the outbound request's filter query parameter JSON-decodes to [\"tenantId\", \"=\", 119], requireTotalCount is \"true\", and the result contains exactly those 2 persons with id/firstName/lastName/emailAddress/tenantId/azureId for each.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_returns_fields_for_tenant"],
+    "result": "untested",
+    "evidence": "Not yet implemented. Dev leg adds src/immybot_mcp/tools/persons.py and this test, then fills in result/evidence from the actual pytest run."
+  },
+  {
+    "id": "TC2",
+    "ac": "AC2",
+    "text": "Given a Recorder stub for Persons/dx returning zero rows for tenantId=119, When immybot_persons_list(tenantId=119) is called, Then the result is an empty persons list with count: 0 and no error.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_empty_tenant_returns_empty_list"],
+    "result": "untested",
+    "evidence": "Not yet implemented. Dev leg adds this test, then fills in result/evidence from the actual pytest run."
+  },
+  {
+    "id": "TC3",
+    "ac": "AC3",
+    "text": "Given a Recorder stub returning an ImmyBot error response (HTTP 404) for Persons/dx, When immybot_persons_list(tenantId=<id>) is called, Then the tool returns the standard structured error envelope, not an unhandled exception.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_vendor_error_returns_envelope"],
+    "result": "untested",
+    "evidence": "Not yet implemented. Dev leg adds this test, then fills in result/evidence from the actual pytest run."
+  },
+  {
+    "id": "TC4",
+    "ac": "AC4",
+    "text": "Given a Recorder stub for Persons/dx returning 3 rows for tenantId=119, When immybot_persons_list(tenantId=119, limit=2) is called, Then the result contains exactly 2 persons and has_more is true.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_caps_at_limit_and_sets_has_more"],
+    "result": "untested",
+    "evidence": "Not yet implemented. Dev leg adds this test, then fills in result/evidence from the actual pytest run."
+  },
+  {
+    "id": "TC5",
+    "ac": "AC5",
+    "text": "Given a Recorder stub for Persons/dx that returns one row for tenantId=119 and one row for a different tenantId, When immybot_persons_list(tenantId=119) is called, Then only the matching tenant's row is present in the result.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_filters_out_other_tenants_defensively"],
+    "result": "untested",
+    "evidence": "Not yet implemented. Dev leg adds this test, then fills in result/evidence from the actual pytest run. Mirrors the defensive tenantId re-filter already used by immybot_computers_list (computers.py:75)."
+  },
+  {
+    "id": "TC6",
+    "ac": "registration/navigation regression",
+    "text": "Given the server built via create_mcp_server(), When tools/list is read, Then immybot_persons_list is present with required parameter {tenantId}, the total tool count is 69, and immybot_navigate(domain=\"persons\") lists immybot_persons_list.",
+    "type": "auto",
+    "tests": [
+      "tests/test_tools.py::test_tool_names_are_stable",
+      "tests/test_tools.py::test_required_params",
+      "tests/test_tools.py::test_navigate_lists_every_tool"
+    ],
+    "result": "untested",
+    "evidence": "Not yet implemented. Dev leg updates EXPECTED_TOOLS, the hardcoded tool count (68 -> 69), and the \"persons\" DOMAINS entry, then fills in result/evidence from the actual pytest run."
+  }
+]
