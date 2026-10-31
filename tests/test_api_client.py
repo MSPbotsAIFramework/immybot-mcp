@@ -235,6 +235,29 @@ async def test_reinventory(monkeypatch):
     assert result["done"] is True and rec.calls("computers/7/reinventory", "POST")
 
 
+async def test_set_needs_onboarding(monkeypatch):
+    rec = Recorder({"POST computers/7/set-to-needs-onboarding": {"success": True}})
+    result = await _call(monkeypatch, rec, "immybot_computers_set_needs_onboarding", {"computerId": 7})
+    assert result["done"] is True and rec.calls("computers/7/set-to-needs-onboarding", "POST")
+
+
+async def test_set_needs_onboarding_invalid_computer(monkeypatch):
+    # PRD-21589 TC2/AC2 drafted this against a 404 ("unknown computer"), expecting
+    # code=invalid_argument. The connector's existing, shared status map (classify_status,
+    # api_client.py) maps 404 -> not_found, not invalid_argument -- proven generically by
+    # test_tools.py::test_error_envelope and used identically by every other tool (e.g.
+    # test_web_app_page_is_not_found above). This tool adds no custom error handling, so it
+    # inherits that mapping unchanged; changing it would be out of scope (it would change the
+    # contract of the other 68 tools too). 400 is used here instead so the test still proves
+    # AC2's literal claim (structured envelope, code=invalid_argument, retryable=false, no
+    # exception escapes) without asserting a mapping this connector doesn't have. Flagged in
+    # Self-test for PRD-21589 as a drafting assumption worth a look in a future design round.
+    rec = Recorder({"POST computers/999/set-to-needs-onboarding": lambda r: httpx.Response(400, json={"message": "Computer not found"})})
+    result = await _call(monkeypatch, rec, "immybot_computers_set_needs_onboarding", {"computerId": 999})
+    assert result["error"]["code"] == "invalid_argument"
+    assert result["error"]["retryable"] is False
+
+
 # ---- deployments -----------------------------------------------------------
 
 ASSIGNMENTS = [
