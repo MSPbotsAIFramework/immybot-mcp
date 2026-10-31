@@ -59,6 +59,7 @@ EXPECTED_TOOLS: dict[str, set[str]] = {
     "immybot_scripts_get": {"scriptId"},
     "immybot_scripts_search": {"query"},
     "immybot_scripts_run": {"scriptId", "computerId"},
+    "immybot_scripts_run_adhoc": {"computerId", "content"},
     "immybot_scripts_categories": set(),
     "immybot_scripts_execution_history": C,
     "immybot_scripts_execution_result": {"scriptId", "executionId"},
@@ -107,6 +108,7 @@ CONFIRM_TOOLS = {
     "immybot_deployments_trigger",
     "immybot_maintenance_sessions_start",
     "immybot_scripts_run",
+    "immybot_scripts_run_adhoc",
     "immybot_software_install",
 }
 UNSUPPORTED_TOOLS = {n for n in EXPECTED_TOOLS if n.startswith("immybot_tasks_")} | {
@@ -127,7 +129,7 @@ def tools():
 
 def test_tool_names_are_stable(tools):
     assert set(tools) == set(EXPECTED_TOOLS)
-    assert len(tools) == 68
+    assert len(tools) == 69
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_TOOLS))
