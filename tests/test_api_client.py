@@ -464,6 +464,116 @@ async def test_script_run_cancellation_id_is_unique_per_call(monkeypatch):
     assert uuid.UUID(first) and uuid.UUID(second) and first != second
 
 
+async def test_scripts_run_adhoc_executes_and_returns_output(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="hi")})
+    result = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "Write-Output 'hi'", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert set(sent) == {"body", "computerId", "cancellationId"}
+    assert sent["computerId"] == 7
+    assert sent["body"]["action"] == "Write-Output 'hi'"
+    assert result["done"] is True and result["output"] == {"output": "hi"}
+
+
+async def test_scripts_run_adhoc_preview_truncates_long_excerpt(monkeypatch):
+    content = "x" * 250
+    rec = Recorder()
+    preview = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": content})
+    assert preview["done"] is False and not rec.requests
+    assert preview["action"].endswith("x" * 200 + "...")
+    assert "x" * 201 not in preview["action"]
+
+
+async def test_scripts_run_adhoc_preview_keeps_full_excerpt_at_200_chars(monkeypatch):
+    content = "y" * 200
+    rec = Recorder()
+    preview = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": content})
+    assert preview["done"] is False and not rec.requests
+    assert content in preview["action"] and "..." not in preview["action"]
+
+
+async def test_scripts_run_adhoc_honors_command_line_language(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "language": "CommandLine", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert sent["body"]["scriptLanguage"] == "CommandLine"
+
+
+async def test_scripts_run_adhoc_uses_body_key_and_real_cancellation_id(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert "script" not in sent
+    assert uuid.UUID(sent["cancellationId"])
+
+
+async def test_scripts_run_adhoc_rejects_empty_content_without_a_request(monkeypatch):
+    rec = Recorder()
+    result = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "", "confirm": True})
+    assert not rec.requests
+    assert result.get("done") is not True
+    assert result["error"]["code"] == "invalid_argument"
+
+
+async def test_scripts_run_adhoc_defaults(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])["body"]
+    assert sent["outputType"] == "Object"
+    assert sent["scriptExecutionContext"] == "System"
+    assert sent["timeout"] == 30
+    assert sent["parameterOverrides"] == {}
+    assert sent["name"] == "Ad hoc script (MCP)"
+
+
+async def test_scripts_run_adhoc_overrides(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
+    await _call(
+        monkeypatch,
+        rec,
+        "immybot_scripts_run_adhoc",
+        {
+            "computerId": 7,
+            "content": "dir",
+            "name": "Ginko probe",
+            "outputType": "Table",
+            "timeout": 60,
+            "runAs": "User",
+            "parameters": {"A": 1},
+            "confirm": True,
+        },
+    )
+    sent = body(rec.calls("scripts/run", "POST")[0])["body"]
+    assert sent["name"] == "Ginko probe"
+    assert sent["outputType"] == "Table"
+    assert sent["timeout"] == 60
+    assert sent["parameterOverrides"] == {"A": 1}
+    assert sent["scriptExecutionContext"] == "CurrentUser"
+
+
+async def test_scripts_run_adhoc_never_logs_script_content(monkeypatch, caplog):
+    import logging
+
+    caplog.set_level(logging.DEBUG, logger="immybot_mcp.tools")
+    secret_script = "Invoke-Secret -Token 'do-not-log-me-12345'"
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="do-not-log-me-output")})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": secret_script})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": secret_script, "confirm": True})
+    for record in caplog.records:
+        assert secret_script not in record.getMessage()
+        assert "do-not-log-me" not in record.getMessage()
+
+
+async def test_scripts_run_adhoc_preserves_special_characters(monkeypatch):
+    tricky = 'Write-Output \'it\'\'s\' `n a `"backtick`" line\nsecond line'
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": tricky, "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert sent["body"]["action"] == tricky
+    preview_rec = Recorder()
+    preview = await _call(monkeypatch, preview_rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": tricky})
+    assert tricky in preview["action"]
+
+
 async def test_script_validate(monkeypatch):
     rec = Recorder({"POST scripts/syntax-check": {"isSyntaxValid": False, "errors": [{"message": "Missing }"}]}})
     result = await _call(monkeypatch, rec, "immybot_scripts_validate", {"content": "if ($x) {"})
