@@ -117,7 +117,7 @@ to use instead).
 | Area | Tools |
 |---|---|
 | Overview | `immybot_navigate` (**domain**), `immybot_back`, `immybot_status` |
-| Computers | `immybot_computers_list` (tenantId, isOnline, operatingSystem, search, skip, limit), `immybot_computers_get` (**computerId**), `immybot_computers_search` (**query**), `immybot_computers_inventory` (**computerId**), `immybot_computers_deployments` (**computerId**); **write**: `immybot_computers_trigger_checkin` (**computerId**; re-inventory); **n/a**: `immybot_computers_create` |
+| Computers | `immybot_computers_list` (tenantId, isOnline, operatingSystem, search, skip, limit), `immybot_computers_get` (**computerId**), `immybot_computers_search` (**query**), `immybot_computers_inventory` (**computerId**), `immybot_computers_deployments` (**computerId**); **write**: `immybot_computers_trigger_checkin` (**computerId**; re-inventory), `immybot_computers_set_needs_onboarding` (**computerId**; needs onboarding); **n/a**: `immybot_computers_create` |
 | Deployments | `immybot_deployments_list` (targetType, targetId, softwareId, desiredState), `immybot_deployments_get` (**deploymentId**), `immybot_deployments_compliance` (**deploymentId**), `immybot_deployments_for_computer` (**computerId**), `immybot_deployments_for_software` (**softwareId**); **write**: `immybot_deployments_create` (**name**, **softwareId**, **targetType**, **targetId**, **desiredState**); **confirm**: `immybot_deployments_trigger` (**deploymentId**) |
 | Maintenance sessions | `immybot_maintenance_sessions_list` (computerId, tenantId, status, startDate, endDate), `_get` (**sessionId**), `_logs` (**sessionId**), `_results` (**sessionId**), `_active`, `_summary` (tenantId, startDate, endDate); **write**: `_cancel` (**sessionId**), `_resume` (**sessionId**); **confirm**: `_start` (computerId or tenantId, detectionOnly); **n/a**: `_pause` |
 | Scripts | `immybot_scripts_list` (category, isGlobal, search, language), `_get` (**scriptId**, databaseType), `_search` (**query**), `_categories`, `_validate` (**content**); **confirm**: `_run` (**scriptId**, **computerId**, parameters, timeout, runAs); **n/a**: `_execution_history`, `_execution_result` |
@@ -185,7 +185,7 @@ uv run pytest
 
 ## Delivery notes
 
-- **Tool count (68).** Kept as is because the tool names are an existing contract.
+- **Tool count (69).** Kept as is because the tool names are an existing contract.
 - **Token scope fixed.** ImmyBot's Entra application uses the instance URL as its App ID URI,
   so the token scope is `https://{subdomain}.immy.bot/.default`. Older versions requested
   `api://{client_id}/.default`, a token ImmyBot does not accept.
