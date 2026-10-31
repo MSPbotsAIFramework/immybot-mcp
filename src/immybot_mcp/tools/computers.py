@@ -170,6 +170,16 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
 
         return await run_tool("immybot_computers_trigger_checkin", client_factory, action)
 
+    @mcp.tool(annotations=WRITES_IDEMPOTENT)
+    async def immybot_computers_set_needs_onboarding(computerId: ComputerId) -> str:
+        """Mark a computer as needing onboarding; the next run starts it. Only when the user explicitly asks."""
+
+        async def action(client: ImmyBotClient) -> Any:
+            result = await client.post(f"computers/{computerId}/set-to-needs-onboarding")
+            return {"done": True, "computer_id": computerId, "result": result}
+
+        return await run_tool("immybot_computers_set_needs_onboarding", client_factory, action)
+
     @mcp.tool(annotations=DESTRUCTIVE)
     async def immybot_computers_delete(
         computerIds: Annotated[

@@ -33,6 +33,7 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
             "immybot_computers_create",
             "immybot_computers_deployments",
             "immybot_computers_trigger_checkin",
+            "immybot_computers_set_needs_onboarding",
         ],
     ),
     "software": (
@@ -69,6 +70,7 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
             "immybot_scripts_get",
             "immybot_scripts_search",
             "immybot_scripts_run",
+            "immybot_scripts_run_adhoc",
             "immybot_scripts_categories",
             "immybot_scripts_execution_history",
             "immybot_scripts_execution_result",

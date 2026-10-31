@@ -48,6 +48,7 @@ from ._common import (
 ScriptId = Annotated[int, Field(description="Script id.", ge=1)]
 Category = Annotated[str | None, Field(description=f"Script category: {', '.join(SCRIPT_CATEGORY)}.")]
 ValidateLanguage = Literal["PowerShell", "CommandLine"]
+AdhocOutputType = Literal["Object", "Table"]
 # /scripts/run streams until the script ends; ImmyBot's own gateway stops it near 120s
 # and ours at 120s, so cap the wait below both.
 _RUN_READ_TIMEOUT = 95.0
@@ -153,6 +154,49 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
             return {"done": True, "script_id": scriptId, "computer_id": computerId, "output": output}
 
         return await run_tool("immybot_scripts_run", client_factory, action)
+
+    @mcp.tool(annotations=DESTRUCTIVE)
+    async def immybot_scripts_run_adhoc(
+        computerId: ComputerId,
+        content: Annotated[str, Field(description="Script text to run. Not saved to the catalog.", min_length=1)],
+        language: Annotated[ValidateLanguage | str, Field(description="Script language.")] = "PowerShell",
+        name: Annotated[str | None, Field(description="Optional label shown in ImmyBot's own run history.")] = None,
+        outputType: Annotated[AdhocOutputType, Field(description="Object = structured JSON, Table = tabular text.")] = "Object",
+        parameters: Annotated[dict[str, Any] | None, Field(description="Parameter values by name.")] = None,
+        timeout: Annotated[int, Field(description="Script timeout in seconds (max 90 here).", ge=1, le=90)] = 30,
+        runAs: Annotated[Literal["System", "User"], Field(description="User = run as the logged-on user; System keeps the script's own context.")] = "System",
+        confirm: Confirm = None,
+    ) -> str:
+        """Run inline script text on one computer now and return its output. Needs confirm: true.
+
+        Executes code on the endpoint without saving it to the script catalog first. Unlike
+        immybot_scripts_run, there is no catalog record to review beforehand with immybot_scripts_get,
+        so the confirmation preview itself carries a truncated excerpt of the script. Only when the
+        user explicitly asks; run immybot_scripts_validate first if unsure of syntax.
+        """
+
+        async def action(client: ImmyBotClient) -> Any:
+            if confirm is not True:
+                excerpt = content if len(content) <= 200 else content[:200] + "..."
+                return not_confirmed(f"Run an ad hoc {enum_value(language, ValidateLanguage)} script on computer {computerId} as {runAs}: {excerpt}")
+            payload = {
+                "name": name or "Ad hoc script (MCP)",
+                "action": content,
+                "scriptLanguage": enum_value(language, ValidateLanguage),
+                "outputType": outputType,
+                "timeout": timeout,
+                "parameterOverrides": parameters or {},
+                "variables": {},
+            }
+            payload["scriptExecutionContext"] = "CurrentUser" if runAs == "User" else "System"
+            output = await client.post(
+                "scripts/run",
+                {"body": payload, "computerId": computerId, "cancellationId": str(uuid.uuid4())},
+                read_timeout=_RUN_READ_TIMEOUT,
+            )
+            return {"done": True, "computer_id": computerId, "output": output}
+
+        return await run_tool("immybot_scripts_run_adhoc", client_factory, action)
 
     @mcp.tool(annotations=LOCAL)
     async def immybot_scripts_categories() -> str:
