@@ -21,11 +21,14 @@ from pydantic import Field
 from ..api_client import ImmyBotClient
 from ._common import (
     DEFAULT,
+    DESTRUCTIVE,
     LOCAL,
+    MAX_PAGE_LIMIT,
     READ_ONLY,
     WRITES_IDEMPOTENT,
     ClientFactory,
     ComputerId,
+    Confirm,
     PageLimit,
     OptionalTenantId,
     as_list,
@@ -34,6 +37,7 @@ from ._common import (
     listing,
     mask_parameters,
     names,
+    not_confirmed,
     run_tool,
     unsupported,
 )
@@ -165,3 +169,24 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
             return {"done": True, "computer_id": computerId, "result": result}
 
         return await run_tool("immybot_computers_trigger_checkin", client_factory, action)
+
+    @mcp.tool(annotations=DESTRUCTIVE)
+    async def immybot_computers_delete(
+        computerIds: Annotated[
+            list[int], Field(description="Computer ids to permanently delete.", min_length=1, max_length=MAX_PAGE_LIMIT)
+        ],
+        confirm: Confirm = None,
+    ) -> str:
+        """Permanently delete one or more computer records (device offboarding). Needs confirm: true.
+
+        Only when the user explicitly asks. This removes ImmyBot's own record; it does not
+        uninstall the ImmyBot agent from the physical device.
+        """
+
+        async def action(client: ImmyBotClient) -> Any:
+            if confirm is not True:
+                return not_confirmed(f"Delete {len(computerIds)} computer record(s): {', '.join(map(str, computerIds))}")
+            result = await client.post("computers/bulk-delete", {"ids": computerIds})
+            return {"done": True, "deleted_count": len(computerIds), "computer_ids": computerIds, "result": result}
+
+        return await run_tool("immybot_computers_delete", client_factory, action)
