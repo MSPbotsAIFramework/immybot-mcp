@@ -34,6 +34,7 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
             "immybot_computers_deployments",
             "immybot_computers_trigger_checkin",
             "immybot_computers_set_needs_onboarding",
+            "immybot_computers_delete",
         ],
     ),
     "software": (
