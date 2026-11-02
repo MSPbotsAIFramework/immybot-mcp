@@ -148,7 +148,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
                 payload["scriptExecutionContext"] = "System"
             output = await client.post(
                 "scripts/run",
-                {"body": payload, "computerId": computerId, "cancellationId": str(uuid.uuid4())},
+                {"script": payload, "computerId": computerId, "cancellationId": str(uuid.uuid4())},
                 read_timeout=_RUN_READ_TIMEOUT,
             )
             return {"done": True, "script_id": scriptId, "computer_id": computerId, "output": output}
@@ -191,7 +191,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
             payload["scriptExecutionContext"] = "CurrentUser" if runAs == "User" else "System"
             output = await client.post(
                 "scripts/run",
-                {"body": payload, "computerId": computerId, "cancellationId": str(uuid.uuid4())},
+                {"script": payload, "computerId": computerId, "cancellationId": str(uuid.uuid4())},
                 read_timeout=_RUN_READ_TIMEOUT,
             )
             return {"done": True, "computer_id": computerId, "output": output}
