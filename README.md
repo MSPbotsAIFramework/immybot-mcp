@@ -223,7 +223,7 @@ uv run pytest
 - **Script runs** are synchronous; the wait is capped at 95 seconds (script `timeout` max 90)
   to stay inside the gateway's tool-call limit.
 - **Ad hoc scripts** (`immybot_scripts_run_adhoc`) reuse the same `/scripts/run` endpoint and
-  `body` / `cancellationId` contract as stored scripts; the confirmation preview includes a
+  `script` / `cancellationId` contract as stored scripts; the confirmation preview includes a
   truncated excerpt of the script because there is no catalog id to review separately first.
 
 ## License

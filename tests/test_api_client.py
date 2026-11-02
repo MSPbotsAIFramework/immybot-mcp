@@ -432,9 +432,9 @@ async def test_script_run_needs_confirm_and_replays_script(monkeypatch):
     )
     sent = body(rec.calls("scripts/run", "POST")[0])
     assert sent["computerId"] == 7
-    assert "script" not in sent
-    assert sent["body"]["action"] == SCRIPT["action"] and sent["body"]["parameterOverrides"] == {"Days": 3}
-    assert sent["body"]["scriptExecutionContext"] == "CurrentUser" and sent["body"]["variables"] == {}
+    assert "body" not in sent
+    assert sent["script"]["action"] == SCRIPT["action"] and sent["script"]["parameterOverrides"] == {"Days": 3}
+    assert sent["script"]["scriptExecutionContext"] == "CurrentUser" and sent["script"]["variables"] == {}
     assert uuid.UUID(sent["cancellationId"]) and sent["cancellationId"] != "mcp-31-7"
     assert result["output"] == {"output": "removed 12 files"}
     assert SCRIPT["action"] not in json.dumps(result)
@@ -450,7 +450,7 @@ async def test_script_run_executes_global_script(monkeypatch):
     )
     result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "databaseType": "Global", "confirm": True})
     sent = body(rec.calls("scripts/run", "POST")[0])
-    assert sent["body"]["databaseType"] == "Global"
+    assert sent["script"]["databaseType"] == "Global"
     assert uuid.UUID(sent["cancellationId"])
     assert result["done"] is True
 
@@ -468,9 +468,9 @@ async def test_scripts_run_adhoc_executes_and_returns_output(monkeypatch):
     rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="hi")})
     result = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "Write-Output 'hi'", "confirm": True})
     sent = body(rec.calls("scripts/run", "POST")[0])
-    assert set(sent) == {"body", "computerId", "cancellationId"}
+    assert set(sent) == {"script", "computerId", "cancellationId"}
     assert sent["computerId"] == 7
-    assert sent["body"]["action"] == "Write-Output 'hi'"
+    assert sent["script"]["action"] == "Write-Output 'hi'"
     assert result["done"] is True and result["output"] == {"output": "hi"}
 
 
@@ -495,14 +495,14 @@ async def test_scripts_run_adhoc_honors_command_line_language(monkeypatch):
     rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
     await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "language": "CommandLine", "confirm": True})
     sent = body(rec.calls("scripts/run", "POST")[0])
-    assert sent["body"]["scriptLanguage"] == "CommandLine"
+    assert sent["script"]["scriptLanguage"] == "CommandLine"
 
 
-async def test_scripts_run_adhoc_uses_body_key_and_real_cancellation_id(monkeypatch):
+async def test_scripts_run_adhoc_uses_script_key_and_real_cancellation_id(monkeypatch):
     rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
     await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "confirm": True})
     sent = body(rec.calls("scripts/run", "POST")[0])
-    assert "script" not in sent
+    assert "body" not in sent
     assert uuid.UUID(sent["cancellationId"])
 
 
@@ -517,7 +517,7 @@ async def test_scripts_run_adhoc_rejects_empty_content_without_a_request(monkeyp
 async def test_scripts_run_adhoc_defaults(monkeypatch):
     rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
     await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "confirm": True})
-    sent = body(rec.calls("scripts/run", "POST")[0])["body"]
+    sent = body(rec.calls("scripts/run", "POST")[0])["script"]
     assert sent["outputType"] == "Object"
     assert sent["scriptExecutionContext"] == "System"
     assert sent["timeout"] == 30
@@ -542,7 +542,7 @@ async def test_scripts_run_adhoc_overrides(monkeypatch):
             "confirm": True,
         },
     )
-    sent = body(rec.calls("scripts/run", "POST")[0])["body"]
+    sent = body(rec.calls("scripts/run", "POST")[0])["script"]
     assert sent["name"] == "Ginko probe"
     assert sent["outputType"] == "Table"
     assert sent["timeout"] == 60
@@ -568,7 +568,7 @@ async def test_scripts_run_adhoc_preserves_special_characters(monkeypatch):
     rec = Recorder({"POST scripts/run": lambda r: httpx.Response(200, text="ok")})
     await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": tricky, "confirm": True})
     sent = body(rec.calls("scripts/run", "POST")[0])
-    assert sent["body"]["action"] == tricky
+    assert sent["script"]["action"] == tricky
     preview_rec = Recorder()
     preview = await _call(monkeypatch, preview_rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": tricky})
     assert tricky in preview["action"]
