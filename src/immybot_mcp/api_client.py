@@ -130,6 +130,7 @@ class ImmyBotClient:
         self._credentials = credentials
         self._http = http_client
         self.instance_url = credentials.instance_url
+        self.client_id = credentials.client_id
         self.base_url = f"{credentials.instance_url}/api/v1"
 
     # ---- auth -----------------------------------------------------------------

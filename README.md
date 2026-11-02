@@ -220,11 +220,18 @@ uv run pytest
   maximum of 500; `immybot_maintenance_sessions_logs` keeps a maximum of 1000 log lines. All default
   to 50, and results are still cut to 20,000 characters with a truncation notice.
   `immybot_computers_list` pages with `skip` and takes at most 200 per call.
-- **Script runs** are synchronous; the wait is capped at 95 seconds (script `timeout` max 90)
-  to stay inside the gateway's tool-call limit.
+- **Script runs are queued, then collected.** `POST /scripts/run` answers `202` with an empty
+  body: it only queues the run. The output lands in the ad hoc run record, so both run tools
+  poll `adhoc-script-runs/dx` (scoped to the caller's own client id and the target computer)
+  until the run reaches a terminal status, and return its `status` and `output`. The wait is
+  capped at 95 seconds (script `timeout` max 90) to stay inside the gateway's tool-call limit;
+  a run still going when that runs out comes back with `timed_out: true`. The run record also
+  carries the script text (`scriptText` / `scriptPreview`); those fields are never copied into
+  a tool result.
 - **Ad hoc scripts** (`immybot_scripts_run_adhoc`) reuse the same `/scripts/run` endpoint and
-  `script` / `cancellationId` contract as stored scripts; the confirmation preview includes a
-  truncated excerpt of the script because there is no catalog id to review separately first.
+  `script` / `cancellationId` contract as stored scripts, with `id: 0` marking a body that is not
+  in the catalog; the confirmation preview includes a truncated excerpt of the script because
+  there is no catalog id to review separately first.
 
 ## License
 
