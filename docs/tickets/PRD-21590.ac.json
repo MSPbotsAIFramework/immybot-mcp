@@ -5,8 +5,8 @@
     "text": "Given a Recorder stub for Persons/dx returning 2 persons for tenantId=119 with all six fields populated, When immybot_persons_list(tenantId=119) is called, Then the outbound request's filter query parameter JSON-decodes to [\"tenantId\", \"=\", 119], requireTotalCount is \"true\", and the result contains exactly those 2 persons with id/firstName/lastName/emailAddress/tenantId/azureId for each.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_persons_list_returns_fields_for_tenant"],
-    "result": "untested",
-    "evidence": "Not yet implemented. Dev leg adds src/immybot_mcp/tools/persons.py and this test, then fills in result/evidence from the actual pytest run."
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83 (synced with main@a5abd1c): test_persons_list_returns_fields_for_tenant PASSED. Asserted filter decodes to [\"tenantId\",\"=\",119], requireTotalCount==\"true\", result[\"persons\"]==rows (both stubbed persons, all six fields), result[\"total\"]==2."
   },
   {
     "id": "TC2",
@@ -14,8 +14,8 @@
     "text": "Given a Recorder stub for Persons/dx returning zero rows for tenantId=119, When immybot_persons_list(tenantId=119) is called, Then the result is an empty persons list with count: 0 and no error.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_persons_list_empty_tenant_returns_empty_list"],
-    "result": "untested",
-    "evidence": "Not yet implemented. Dev leg adds this test, then fills in result/evidence from the actual pytest run."
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83: test_persons_list_empty_tenant_returns_empty_list PASSED. Asserted result[\"persons\"]==[] and result[\"count\"]==0 and no \"error\" key."
   },
   {
     "id": "TC3",
@@ -23,8 +23,8 @@
     "text": "Given a Recorder stub returning an ImmyBot error response (HTTP 404) for Persons/dx, When immybot_persons_list(tenantId=<id>) is called, Then the tool returns the standard structured error envelope, not an unhandled exception.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_persons_list_vendor_error_returns_envelope"],
-    "result": "untested",
-    "evidence": "Not yet implemented. Dev leg adds this test, then fills in result/evidence from the actual pytest run."
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83: test_persons_list_vendor_error_returns_envelope PASSED. Stubbed a 404 with {\"error\":{\"code\":\"not_found\",\"message\":\"Tenant not found\"}}; asserted result[\"error\"][\"code\"]==\"not_found\" and message ends with \"Tenant not found\" (via the shared ImmyBotError -> error_envelope() path every other tool uses)."
   },
   {
     "id": "TC4",
@@ -32,8 +32,8 @@
     "text": "Given a Recorder stub for Persons/dx returning 3 rows for tenantId=119, When immybot_persons_list(tenantId=119, limit=2) is called, Then the result contains exactly 2 persons and has_more is true.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_persons_list_caps_at_limit_and_sets_has_more"],
-    "result": "untested",
-    "evidence": "Not yet implemented. Dev leg adds this test, then fills in result/evidence from the actual pytest run."
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83: test_persons_list_caps_at_limit_and_sets_has_more PASSED. 3 stubbed rows, limit=2: len(result[\"persons\"])==2, result[\"has_more\"] is True, outbound take==\"2\"."
   },
   {
     "id": "TC5",
@@ -41,8 +41,8 @@
     "text": "Given a Recorder stub for Persons/dx that returns one row for tenantId=119 and one row for a different tenantId, When immybot_persons_list(tenantId=119) is called, Then only the matching tenant's row is present in the result.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_persons_list_filters_out_other_tenants_defensively"],
-    "result": "untested",
-    "evidence": "Not yet implemented. Dev leg adds this test, then fills in result/evidence from the actual pytest run. Mirrors the defensive tenantId re-filter already used by immybot_computers_list (computers.py:75)."
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83: test_persons_list_filters_out_other_tenants_defensively PASSED. Stub returned one row for tenantId=119 and one for tenantId=5; called with tenantId=119; only id=1 (tenantId=119) came back. Mirrors the defensive tenantId re-filter already used by immybot_computers_list (computers.py:75)."
   },
   {
     "id": "TC6",
@@ -54,7 +54,7 @@
       "tests/test_tools.py::test_required_params",
       "tests/test_tools.py::test_navigate_lists_every_tool"
     ],
-    "result": "untested",
-    "evidence": "Not yet implemented. Dev leg updates EXPECTED_TOOLS, the hardcoded tool count (68 -> 69), and the \"persons\" DOMAINS entry, then fills in result/evidence from the actual pytest run."
+    "result": "pass",
+    "evidence": "uv run pytest -q on TESTED=959ac83: 528 passed, 11 skipped, 0 failed, including test_tool_names_are_stable, test_required_params[immybot_persons_list], and test_navigate_lists_every_tool. The expected total tool count moved from the design-time 69 to 72: between design (base cfc9181) and this dev leg, PRD-21587 (immybot_scripts_run_adhoc), PRD-21589 (immybot_computers_set_needs_onboarding) and PRD-21591 (immybot_computers_delete) merged into main first, each adding one tool (68->71); this ticket's immybot_persons_list is the 72nd. test_tool_names_are_stable and README's \"Tool count\" line were updated to 72 accordingly (and the README line, which still read a stale 70 even on post-merge main, was corrected in the same edit since this ticket touches that exact line). This does not weaken AC6: the check is still that the new tool is present, reachable via the \"persons\" domain, and the total matches the actual registered set -- confirmed live via a local tools/list call (see Self-test, Local smoke rows) returning exactly 72 tools including immybot_persons_list with required {tenantId}."
   }
 ]
