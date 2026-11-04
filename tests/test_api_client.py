@@ -235,6 +235,29 @@ async def test_reinventory(monkeypatch):
     assert result["done"] is True and rec.calls("computers/7/reinventory", "POST")
 
 
+async def test_set_needs_onboarding(monkeypatch):
+    rec = Recorder({"POST computers/7/set-to-needs-onboarding": {"success": True}})
+    result = await _call(monkeypatch, rec, "immybot_computers_set_needs_onboarding", {"computerId": 7})
+    assert result["done"] is True and rec.calls("computers/7/set-to-needs-onboarding", "POST")
+
+
+async def test_set_needs_onboarding_invalid_computer(monkeypatch):
+    # PRD-21589 TC2/AC2 drafted this against a 404 ("unknown computer"), expecting
+    # code=invalid_argument. The connector's existing, shared status map (classify_status,
+    # api_client.py) maps 404 -> not_found, not invalid_argument -- proven generically by
+    # test_tools.py::test_error_envelope and used identically by every other tool (e.g.
+    # test_web_app_page_is_not_found above). This tool adds no custom error handling, so it
+    # inherits that mapping unchanged; changing it would be out of scope (it would change the
+    # contract of the other 68 tools too). 400 is used here instead so the test still proves
+    # AC2's literal claim (structured envelope, code=invalid_argument, retryable=false, no
+    # exception escapes) without asserting a mapping this connector doesn't have. Flagged in
+    # Self-test for PRD-21589 as a drafting assumption worth a look in a future design round.
+    rec = Recorder({"POST computers/999/set-to-needs-onboarding": lambda r: httpx.Response(400, json={"message": "Computer not found"})})
+    result = await _call(monkeypatch, rec, "immybot_computers_set_needs_onboarding", {"computerId": 999})
+    assert result["error"]["code"] == "invalid_argument"
+    assert result["error"]["retryable"] is False
+
+
 async def test_set_primary_user_minimal_body(monkeypatch):
     rec = Recorder({"PUT computers/42": {"id": 42, "primaryPersonId": 7, "inventory": {"big": "blob"}}})
     result = await _call(monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 42, "primaryPersonId": 7})
@@ -432,8 +455,26 @@ async def test_script_get_falls_back_to_global(monkeypatch):
     assert [r.url.path for r in rec.requests] == ["/api/v1/scripts/local/31", "/api/v1/scripts/global/31"]
 
 
+def runs(output='["removed 12 files"]', script_id=31, status=2, script_text=None):
+    """Stub for adhoc-script-runs/dx: empty before the run is queued, one finished run after."""
+    state = {"n": 0}
+
+    def reply(request):
+        state["n"] += 1
+        if state["n"] % 2 == 1:
+            return httpx.Response(200, json={"data": []})
+        row = {
+            "id": f"run-{state['n']}", "scriptId": script_id, "status": status,
+            "output": output, "durationMs": 1200,
+            "scriptText": script_text or SCRIPT["action"], "scriptPreview": script_text or SCRIPT["action"],
+        }
+        return httpx.Response(200, json={"data": [row]})
+
+    return reply
+
+
 async def test_script_run_needs_confirm_and_replays_script(monkeypatch):
-    rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(200, text="removed 12 files")})
+    rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs()})
     preview = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7})
     assert preview["done"] is False and not rec.calls("scripts/run")
     assert SCRIPT["action"] not in json.dumps(preview)
@@ -442,11 +483,11 @@ async def test_script_run_needs_confirm_and_replays_script(monkeypatch):
     )
     sent = body(rec.calls("scripts/run", "POST")[0])
     assert sent["computerId"] == 7
-    assert "script" not in sent
-    assert sent["body"]["action"] == SCRIPT["action"] and sent["body"]["parameterOverrides"] == {"Days": 3}
-    assert sent["body"]["scriptExecutionContext"] == "CurrentUser" and sent["body"]["variables"] == {}
+    assert "body" not in sent
+    assert sent["script"]["action"] == SCRIPT["action"] and sent["script"]["parameterOverrides"] == {"Days": 3}
+    assert sent["script"]["scriptExecutionContext"] == "CurrentUser" and sent["script"]["variables"] == {}
     assert uuid.UUID(sent["cancellationId"]) and sent["cancellationId"] != "mcp-31-7"
-    assert result["output"] == {"output": "removed 12 files"}
+    assert result["output"] == ["removed 12 files"] and result["status"] == "Completed"
     assert SCRIPT["action"] not in json.dumps(result)
 
 
@@ -455,23 +496,148 @@ async def test_script_run_executes_global_script(monkeypatch):
         {
             "scripts/local/31": lambda r: httpx.Response(404, json={}),
             "scripts/global/31": SCRIPT | {"databaseType": None},
-            "POST scripts/run": lambda r: httpx.Response(200, text="removed 12 files"),
+            "POST scripts/run": lambda r: httpx.Response(202),
+            "adhoc-script-runs/dx": runs(),
         }
     )
     result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "databaseType": "Global", "confirm": True})
     sent = body(rec.calls("scripts/run", "POST")[0])
-    assert sent["body"]["databaseType"] == "Global"
+    assert sent["script"]["databaseType"] == "Global"
     assert uuid.UUID(sent["cancellationId"])
     assert result["done"] is True
 
 
 async def test_script_run_cancellation_id_is_unique_per_call(monkeypatch):
-    rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(200, text="ok")})
+    rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs()})
     await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "confirm": True})
     await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "confirm": True})
     calls = rec.calls("scripts/run", "POST")
     first, second = body(calls[0])["cancellationId"], body(calls[1])["cancellationId"]
     assert uuid.UUID(first) and uuid.UUID(second) and first != second
+
+
+async def test_scripts_run_adhoc_executes_and_returns_output(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(output='["hi"]', script_id=0)})
+    result = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "Write-Output 'hi'", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert set(sent) == {"script", "computerId", "cancellationId"}
+    assert sent["computerId"] == 7
+    assert sent["script"]["action"] == "Write-Output 'hi'" and sent["script"]["id"] == 0
+    assert result["done"] is True and result["output"] == ["hi"]
+
+
+async def test_scripts_run_adhoc_preview_truncates_long_excerpt(monkeypatch):
+    content = "x" * 250
+    rec = Recorder()
+    preview = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": content})
+    assert preview["done"] is False and not rec.requests
+    assert preview["action"].endswith("x" * 200 + "...")
+    assert "x" * 201 not in preview["action"]
+
+
+async def test_scripts_run_adhoc_preview_keeps_full_excerpt_at_200_chars(monkeypatch):
+    content = "y" * 200
+    rec = Recorder()
+    preview = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": content})
+    assert preview["done"] is False and not rec.requests
+    assert content in preview["action"] and "..." not in preview["action"]
+
+
+async def test_scripts_run_adhoc_honors_command_line_language(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(output='["ok"]', script_id=0)})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "language": "CommandLine", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert sent["script"]["scriptLanguage"] == "CommandLine"
+
+
+async def test_scripts_run_adhoc_uses_script_key_and_real_cancellation_id(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(output='["ok"]', script_id=0)})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert "body" not in sent
+    assert uuid.UUID(sent["cancellationId"])
+
+
+async def test_scripts_run_adhoc_rejects_empty_content_without_a_request(monkeypatch):
+    rec = Recorder()
+    result = await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "", "confirm": True})
+    assert not rec.requests
+    assert result.get("done") is not True
+    assert result["error"]["code"] == "invalid_argument"
+
+
+async def test_scripts_run_adhoc_defaults(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(output='["ok"]', script_id=0)})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": "dir", "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])["script"]
+    assert sent["outputType"] == "Object"
+    assert sent["scriptExecutionContext"] == "System"
+    assert sent["timeout"] == 30
+    assert sent["parameterOverrides"] == {}
+    assert sent["name"] == "Ad hoc script (MCP)"
+
+
+async def test_scripts_run_adhoc_overrides(monkeypatch):
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(output='["ok"]', script_id=0)})
+    await _call(
+        monkeypatch,
+        rec,
+        "immybot_scripts_run_adhoc",
+        {
+            "computerId": 7,
+            "content": "dir",
+            "name": "Ginko probe",
+            "outputType": "Table",
+            "timeout": 60,
+            "runAs": "User",
+            "parameters": {"A": 1},
+            "confirm": True,
+        },
+    )
+    sent = body(rec.calls("scripts/run", "POST")[0])["script"]
+    assert sent["name"] == "Ginko probe"
+    assert sent["outputType"] == "Table"
+    assert sent["timeout"] == 60
+    assert sent["parameterOverrides"] == {"A": 1}
+    assert sent["scriptExecutionContext"] == "CurrentUser"
+
+
+async def test_scripts_run_adhoc_never_logs_script_content(monkeypatch, caplog):
+    import logging
+
+    caplog.set_level(logging.DEBUG, logger="immybot_mcp.tools")
+    secret_script = "Invoke-Secret -Token 'do-not-log-me-12345'"
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(output='["do-not-log-me-output"]', script_id=0)})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": secret_script})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": secret_script, "confirm": True})
+    for record in caplog.records:
+        assert secret_script not in record.getMessage()
+        assert "do-not-log-me" not in record.getMessage()
+
+
+async def test_scripts_run_adhoc_preserves_special_characters(monkeypatch):
+    tricky = 'Write-Output \'it\'\'s\' `n a `"backtick`" line\nsecond line'
+    rec = Recorder({"POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(output='["ok"]', script_id=0)})
+    await _call(monkeypatch, rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": tricky, "confirm": True})
+    sent = body(rec.calls("scripts/run", "POST")[0])
+    assert sent["script"]["action"] == tricky
+    preview_rec = Recorder()
+    preview = await _call(monkeypatch, preview_rec, "immybot_scripts_run_adhoc", {"computerId": 7, "content": tricky})
+    assert tricky in preview["action"]
+
+
+async def test_script_run_reports_a_run_that_never_finishes(monkeypatch):
+    rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(status=1)})
+    result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "timeout": 1, "confirm": True})
+    assert result["done"] is True and result["timed_out"] is True and result["status"] == "Running"
+    assert SCRIPT["action"] not in json.dumps(result)
+
+
+async def test_script_run_result_never_carries_the_script_body(monkeypatch):
+    rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs()})
+    result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "confirm": True})
+    assert result["status"] == "Completed" and result["output"] == ["removed 12 files"]
+    assert SCRIPT["action"] not in json.dumps(result) and "scriptText" not in json.dumps(result)
 
 
 async def test_script_validate(monkeypatch):
