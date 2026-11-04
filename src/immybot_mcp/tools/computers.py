@@ -27,6 +27,7 @@ from ._common import (
     ClientFactory,
     ComputerId,
     PageLimit,
+    PersonId,
     OptionalTenantId,
     as_list,
     compact,
@@ -165,3 +166,25 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
             return {"done": True, "computer_id": computerId, "result": result}
 
         return await run_tool("immybot_computers_trigger_checkin", client_factory, action)
+
+    @mcp.tool(annotations=WRITES_IDEMPOTENT)
+    async def immybot_computers_set_primary_user(
+        computerId: ComputerId,
+        primaryPersonId: PersonId,
+        onboardingStatus: Annotated[str | None, Field(description="New onboarding status; ImmyBot validates the value.")] = None,
+        additionalPersonIds: Annotated[list[int] | None, Field(description="Other end users linked to this computer, in addition to the primary user.")] = None,
+    ) -> str:
+        """Set a computer's primary user and, optionally, its onboarding status and additional linked users.
+
+        Only when the user explicitly asks. The caller must already know the target person's id — this
+        connector has no tool to look one up by name or email.
+        """
+
+        async def action(client: ImmyBotClient) -> Any:
+            body = {"primaryPersonId": primaryPersonId, "providerLinkUpdates": []} | compact(
+                {"onboardingStatus": onboardingStatus, "additionalPersonIds": additionalPersonIds}
+            )
+            record = await client.put(f"computers/{computerId}", body)
+            return names(drop(record, "inventory"))
+
+        return await run_tool("immybot_computers_set_primary_user", client_factory, action)
