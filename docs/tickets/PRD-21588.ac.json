@@ -6,7 +6,9 @@
         "type": "auto",
         "tests": [
             "tests/test_api_client.py::test_set_primary_user_minimal_body"
-        ]
+        ],
+        "result": "pass",
+        "evidence": "uv run pytest -q tests/test_api_client.py::test_set_primary_user_minimal_body -- PASSED (full gate run 2026-11-04: 528 passed, 11 skipped, code synced with main @ 23d7b27)"
     },
     {
         "id": "TC2",
@@ -15,7 +17,9 @@
         "type": "auto",
         "tests": [
             "tests/test_api_client.py::test_set_primary_user_includes_onboarding_status"
-        ]
+        ],
+        "result": "pass",
+        "evidence": "uv run pytest -q tests/test_api_client.py::test_set_primary_user_includes_onboarding_status -- PASSED, 2026-11-04"
     },
     {
         "id": "TC3",
@@ -24,7 +28,9 @@
         "type": "auto",
         "tests": [
             "tests/test_api_client.py::test_set_primary_user_includes_additional_person_ids"
-        ]
+        ],
+        "result": "pass",
+        "evidence": "uv run pytest -q tests/test_api_client.py::test_set_primary_user_includes_additional_person_ids -- PASSED, 2026-11-04"
     },
     {
         "id": "TC4",
@@ -33,7 +39,9 @@
         "type": "auto",
         "tests": [
             "tests/test_api_client.py::test_set_primary_user_minimal_body"
-        ]
+        ],
+        "result": "pass",
+        "evidence": "same test as TC1 -- assertion `sent == {\"primaryPersonId\": 7, \"providerLinkUpdates\": []}` proves exact-keys with no optional fields present. PASSED, 2026-11-04"
     },
     {
         "id": "TC5",
@@ -42,7 +50,9 @@
         "type": "auto",
         "tests": [
             "tests/test_api_client.py::test_set_primary_user_surfaces_vendor_error"
-        ]
+        ],
+        "result": "pass",
+        "evidence": "uv run pytest -q tests/test_api_client.py::test_set_primary_user_surfaces_vendor_error -- PASSED; asserts error.code == \"not_found\" and error.message ends with vendor's literal \"Person not found\". 2026-11-04"
     },
     {
         "id": "TC6",
@@ -52,7 +62,9 @@
         "tests": [
             "tests/test_tools.py::test_write_tools_say_when_to_use_them",
             "tests/test_tools.py::test_description_budget"
-        ]
+        ],
+        "result": "pass",
+        "evidence": "uv run pytest -q 'tests/test_tools.py::test_write_tools_say_when_to_use_them[immybot_computers_set_primary_user]' 'tests/test_tools.py::test_description_budget[immybot_computers_set_primary_user]' -- both PASSED, 2026-11-04. Also confirmed live via local server smoke test (scratch/PRD-21588/smoke_tools_list.py): tools/list description contains \"explicitly ask\" and \"this connector has no tool to look one up by name or email\""
     },
     {
         "id": "TC7",
@@ -62,7 +74,9 @@
         "tests": [
             "tests/test_tools.py::test_required_params",
             "tests/test_tools.py::test_tool_names_are_stable"
-        ]
+        ],
+        "result": "pass",
+        "evidence": "uv run pytest -q 'tests/test_tools.py::test_required_params[immybot_computers_set_primary_user]' tests/test_tools.py::test_tool_names_are_stable -- both PASSED (72 tools total after merging main's PRD-21587/21589/21591 additions + this ticket's one), 2026-11-04. Confirmed live via local server smoke test: required == {\"computerId\", \"primaryPersonId\"}"
     },
     {
         "id": "TC8",
