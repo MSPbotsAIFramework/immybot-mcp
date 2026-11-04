@@ -554,3 +554,49 @@ async def test_script_validate_language_normalized_or_passed_through(monkeypatch
     rec = Recorder({"POST scripts/syntax-check": {"isSyntaxValid": True}})
     await _call(monkeypatch, rec, "immybot_scripts_validate", {"content": "x", "language": given})
     assert body(rec.requests[0])["scriptLanguage"] == sent
+
+
+# ---- persons ----------------------------------------------------------------
+
+
+async def test_persons_list_returns_fields_for_tenant(monkeypatch):
+    rows = [
+        {"id": 1, "firstName": "Ada", "lastName": "Lovelace", "emailAddress": "ada@example.com", "tenantId": 119, "azureId": "aaa-1"},
+        {"id": 2, "firstName": "Grace", "lastName": "Hopper", "emailAddress": "grace@example.com", "tenantId": 119, "azureId": "aaa-2"},
+    ]
+    rec = Recorder({"Persons/dx": {"data": rows, "totalCount": 2}})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119})
+    params = rec.requests[0].url.params
+    assert json.loads(params["filter"]) == ["tenantId", "=", 119]
+    assert params["requireTotalCount"] == "true"
+    assert result["persons"] == rows
+    assert result["count"] == 2 and result["total"] == 2
+
+
+async def test_persons_list_empty_tenant_returns_empty_list(monkeypatch):
+    rec = Recorder({"Persons/dx": {"data": [], "totalCount": 0}})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119})
+    assert result["persons"] == [] and result["count"] == 0
+    assert "error" not in result
+
+
+async def test_persons_list_vendor_error_returns_envelope(monkeypatch):
+    rec = Recorder({"Persons/dx": lambda r: httpx.Response(404, json={"error": {"code": "not_found", "message": "Tenant not found", "details": None}})})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 999})
+    assert result["error"]["code"] == "not_found"
+    assert result["error"]["message"].endswith("Tenant not found")
+
+
+async def test_persons_list_caps_at_limit_and_sets_has_more(monkeypatch):
+    rows = [{"id": i, "firstName": f"Person{i}", "tenantId": 119} for i in range(1, 4)]
+    rec = Recorder({"Persons/dx": {"data": rows, "totalCount": 3}})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119, "limit": 2})
+    assert len(result["persons"]) == 2 and result["has_more"] is True
+    assert rec.requests[0].url.params["take"] == "2"
+
+
+async def test_persons_list_filters_out_other_tenants_defensively(monkeypatch):
+    rows = [{"id": 1, "firstName": "Ada", "tenantId": 119}, {"id": 2, "firstName": "Other", "tenantId": 5}]
+    rec = Recorder({"Persons/dx": {"data": rows, "totalCount": 2}})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119})
+    assert [p["id"] for p in result["persons"]] == [1]

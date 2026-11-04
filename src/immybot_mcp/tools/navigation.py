@@ -88,6 +88,10 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
             "immybot_tenants_software_inventory",
         ],
     ),
+    "persons": (
+        "Persons (users) in a tenant, e.g. to pick a primary user.",
+        ["immybot_persons_list"],
+    ),
     "maintenance_sessions": (
         "Maintenance sessions: list, start, cancel, resume, logs, per-item results, status counts.",
         [
@@ -125,7 +129,7 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
     ),
 }
 
-Domain = Literal["computers", "software", "deployments", "scripts", "tenants", "maintenance_sessions", "tasks"]
+Domain = Literal["computers", "software", "deployments", "scripts", "tenants", "maintenance_sessions", "tasks", "persons"]
 
 
 def register(mcp: FastMCP, client_factory: ClientFactory) -> None:

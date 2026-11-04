@@ -149,9 +149,9 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
 
     client_factory: Callable[[], ImmyBotClient | None] = get_client_from_context
 
-    from .tools import computers, deployments, maintenance_sessions, navigation, scripts, software, tasks, tenants
+    from .tools import computers, deployments, maintenance_sessions, navigation, persons, scripts, software, tasks, tenants
 
-    for module in (navigation, computers, deployments, maintenance_sessions, scripts, software, tasks, tenants):
+    for module in (navigation, computers, deployments, maintenance_sessions, persons, scripts, software, tasks, tenants):
         module.register(mcp, client_factory)
 
     return mcp
