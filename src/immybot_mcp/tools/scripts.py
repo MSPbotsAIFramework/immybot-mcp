@@ -13,6 +13,9 @@
 # limitations under the License.
 """Scripts: ImmyBot's global (shared) and local (MSP-owned) PowerShell / command-line scripts."""
 
+import asyncio
+import json
+import time
 import uuid
 from typing import Annotated, Any, Literal
 
@@ -48,6 +51,7 @@ from ._common import (
 ScriptId = Annotated[int, Field(description="Script id.", ge=1)]
 Category = Annotated[str | None, Field(description=f"Script category: {', '.join(SCRIPT_CATEGORY)}.")]
 ValidateLanguage = Literal["PowerShell", "CommandLine"]
+AdhocOutputType = Literal["Object", "Table"]
 # /scripts/run streams until the script ends; ImmyBot's own gateway stops it near 120s
 # and ours at 120s, so cap the wait below both.
 _RUN_READ_TIMEOUT = 95.0
@@ -55,6 +59,54 @@ _RUN_FIELDS = (
     "id", "name", "action", "databaseType", "filterScriptMode", "outputType", "scriptCategory", "scriptLanguage",
     "scriptExecutionContext",
 )
+# scripts/run answers 202 with an empty body: it only queues the run. The output lands in the
+# ad hoc run record, which is polled below until the run reaches a terminal status.
+_RUN_STATUS = ("Pending", "Running", "Completed", "Failed", "Cancelled", "TimedOut", "Aborted")
+_RUN_PENDING = ("Pending", "Running")
+_RUN_POLL_SECONDS = 2.0
+_RUN_SORT = json.dumps([{"selector": "createdAt", "desc": True}])
+
+
+async def _run_page(client: ImmyBotClient, computerId: int) -> list[dict]:
+    page = await client.get(
+        "adhoc-script-runs/dx",
+        {"computerId": computerId, "requestingClientId": client.client_id, "take": 10, "sort": _RUN_SORT},
+    )
+    rows = page.get("data") if isinstance(page, dict) else None
+    return [row for row in (rows or []) if isinstance(row, dict)]
+
+
+def _run_result(row: dict, status: str) -> dict:
+    # Only the run's own outcome. The record also carries scriptText / scriptPreview (the script
+    # body); those are never copied out, so a result can never expose the script.
+    output = row.get("output")
+    if isinstance(output, str):
+        try:
+            output = json.loads(output)
+        except ValueError:
+            pass
+    return compact({"status": status, "output": output, "duration_ms": row.get("durationMs")})
+
+
+async def _await_run(client: ImmyBotClient, computerId: int, scriptId: int | None, seen: set, budget: float) -> dict:
+    """Wait for the run queued by scripts/run and return its outcome."""
+    deadline = time.monotonic() + budget
+    # Bounded by both the wall clock and the poll count, so the loop cannot spin when sleeping is cheap.
+    polls = max(1, int(budget / _RUN_POLL_SECONDS))
+    running: dict = {}
+    for attempt in range(polls):
+        for row in await _run_page(client, computerId):
+            if row.get("id") in seen or (scriptId is not None and row.get("scriptId") != scriptId):
+                continue
+            status = str(enum_name(row.get("status"), _RUN_STATUS))
+            if status not in _RUN_PENDING:
+                return _run_result(row, status)
+            running = row
+            break
+        if attempt + 1 == polls or time.monotonic() >= deadline:
+            break
+        await asyncio.sleep(_RUN_POLL_SECONDS)
+    return _run_result(running, "Running") | {"timed_out": True}
 
 
 def _matches(row: dict, category: str | None, language: str | None) -> bool:
@@ -145,14 +197,62 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
                 payload["scriptExecutionContext"] = "CurrentUser"
             elif payload.get("scriptExecutionContext") is None:
                 payload["scriptExecutionContext"] = "System"
-            output = await client.post(
+            seen = {row.get("id") for row in await _run_page(client, computerId)}
+            await client.post(
                 "scripts/run",
-                {"body": payload, "computerId": computerId, "cancellationId": str(uuid.uuid4())},
+                {"script": payload, "computerId": computerId, "cancellationId": str(uuid.uuid4())},
                 read_timeout=_RUN_READ_TIMEOUT,
             )
-            return {"done": True, "script_id": scriptId, "computer_id": computerId, "output": output}
+            run = await _await_run(client, computerId, scriptId, seen, min(timeout + 10.0, _RUN_READ_TIMEOUT))
+            return {"done": True, "script_id": scriptId, "computer_id": computerId} | run
 
         return await run_tool("immybot_scripts_run", client_factory, action)
+
+    @mcp.tool(annotations=DESTRUCTIVE)
+    async def immybot_scripts_run_adhoc(
+        computerId: ComputerId,
+        content: Annotated[str, Field(description="Script text to run. Not saved to the catalog.", min_length=1)],
+        language: Annotated[ValidateLanguage | str, Field(description="Script language.")] = "PowerShell",
+        name: Annotated[str | None, Field(description="Optional label shown in ImmyBot's own run history.")] = None,
+        outputType: Annotated[AdhocOutputType, Field(description="Object = structured JSON, Table = tabular text.")] = "Object",
+        parameters: Annotated[dict[str, Any] | None, Field(description="Parameter values by name.")] = None,
+        timeout: Annotated[int, Field(description="Script timeout in seconds (max 90 here).", ge=1, le=90)] = 30,
+        runAs: Annotated[Literal["System", "User"], Field(description="User = run as the logged-on user; System keeps the script's own context.")] = "System",
+        confirm: Confirm = None,
+    ) -> str:
+        """Run inline script text on one computer now and return its output. Needs confirm: true.
+
+        Executes code on the endpoint without saving it to the script catalog first. Unlike
+        immybot_scripts_run, there is no catalog record to review beforehand with immybot_scripts_get,
+        so the confirmation preview itself carries a truncated excerpt of the script. Only when the
+        user explicitly asks; run immybot_scripts_validate first if unsure of syntax.
+        """
+
+        async def action(client: ImmyBotClient) -> Any:
+            if confirm is not True:
+                excerpt = content if len(content) <= 200 else content[:200] + "..."
+                return not_confirmed(f"Run an ad hoc {enum_value(language, ValidateLanguage)} script on computer {computerId} as {runAs}: {excerpt}")
+            payload = {
+                "id": 0,  # the API marks a script body that is not in the catalog with id 0
+                "name": name or "Ad hoc script (MCP)",
+                "action": content,
+                "scriptLanguage": enum_value(language, ValidateLanguage),
+                "outputType": outputType,
+                "timeout": timeout,
+                "parameterOverrides": parameters or {},
+                "variables": {},
+            }
+            payload["scriptExecutionContext"] = "CurrentUser" if runAs == "User" else "System"
+            seen = {row.get("id") for row in await _run_page(client, computerId)}
+            await client.post(
+                "scripts/run",
+                {"script": payload, "computerId": computerId, "cancellationId": str(uuid.uuid4())},
+                read_timeout=_RUN_READ_TIMEOUT,
+            )
+            run = await _await_run(client, computerId, None, seen, min(timeout + 10.0, _RUN_READ_TIMEOUT))
+            return {"done": True, "computer_id": computerId} | run
+
+        return await run_tool("immybot_scripts_run_adhoc", client_factory, action)
 
     @mcp.tool(annotations=LOCAL)
     async def immybot_scripts_categories() -> str:
