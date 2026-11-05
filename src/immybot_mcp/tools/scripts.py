@@ -63,6 +63,11 @@ _RUN_FIELDS = (
 # ad hoc run record, which is polled below until the run reaches a terminal status.
 _RUN_STATUS = ("Pending", "Running", "Completed", "Failed", "Cancelled", "TimedOut", "Aborted")
 _RUN_PENDING = ("Pending", "Running")
+# ImmyBot keeps status terminal (e.g. "Completed") even when the script threw; the error/exception
+# text is recorded separately on the same row under one of these candidate keys. No OpenAPI schema
+# for this row is available (see PRD-21798 Open questions); this is an explicit, flagged assumption
+# to be confirmed or corrected against a live instance.
+_ERROR_FIELDS = ("error", "errorOutput", "exceptionMessage", "exception")
 _RUN_POLL_SECONDS = 2.0
 _RUN_SORT = json.dumps([{"selector": "createdAt", "desc": True}])
 
@@ -76,6 +81,19 @@ async def _run_page(client: ImmyBotClient, computerId: int) -> list[dict]:
     return [row for row in (rows or []) if isinstance(row, dict)]
 
 
+def _run_errors(row: dict) -> list[str]:
+    """First non-empty candidate error field on the row, as a list of strings. [] if none carry one."""
+    for key in _ERROR_FIELDS:
+        value = row.get(key)
+        if isinstance(value, list):
+            value = [str(item) for item in value if item not in (None, "")]
+            if value:
+                return value
+        elif value not in (None, ""):
+            return [str(value)]
+    return []
+
+
 def _run_result(row: dict, status: str) -> dict:
     # Only the run's own outcome. The record also carries scriptText / scriptPreview (the script
     # body); those are never copied out, so a result can never expose the script.
@@ -85,7 +103,10 @@ def _run_result(row: dict, status: str) -> dict:
             output = json.loads(output)
         except ValueError:
             pass
-    return compact({"status": status, "output": output, "duration_ms": row.get("durationMs")})
+    errors = _run_errors(row)
+    return compact(
+        {"status": status, "output": output, "duration_ms": row.get("durationMs"), "hadErrors": bool(errors), "errors": errors or None}
+    )
 
 
 async def _await_run(client: ImmyBotClient, computerId: int, scriptId: int | None, seen: set, budget: float) -> dict:

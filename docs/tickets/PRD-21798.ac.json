@@ -1,0 +1,75 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC1",
+    "text": "Given a Recorder stub for scripts/local/2 and adhoc-script-runs/dx whose row carries an error field, When immybot_scripts_run(scriptId=2, computerId=1, confirm=true) is called, Then the result has hadErrors: true, errors containing the stubbed error text, and status == \"Completed\" (unchanged).",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
+    "result": "pass",
+    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9, synced with main @ 97d6961); full suite uv run pytest -q -> 538 passed, 11 skipped, 0 failed"
+  },
+  {
+    "id": "TC2",
+    "ac": "AC1",
+    "text": "Given SOP 263, computer DEV-W11-01 (computerId=1), stored Local script 2 (\"MSPbots test - error\"), When an agent calls immybot_scripts_run(scriptId=2, computerId=1, confirm=true) against the live mspbotsai.immy.bot instance, Then the response contains hadErrors: true and errors containing the text TEST-VPN-FAIL simulated error (or the literal text the live record carries).",
+    "type": "manual",
+    "steps": [
+      "Obtain ImmyBot credentials for the mspbotsai.immy.bot instance (tenant 1) used in the ticket",
+      "Call immybot_scripts_run with scriptId=2, computerId=1, runAs=System, timeout=90, confirm=true",
+      "Inspect the tool result for hadErrors/errors; if neither field name in _ERROR_FIELDS carried the text, inspect the raw adhoc-script-runs/dx row for the real field and record it here"
+    ],
+    "expect": "hadErrors: true; errors contains the thrown exception text; status is still ImmyBot's own value (e.g. Completed)",
+    "result": "untested",
+    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): no mspbotsai.immy.bot credentials in this environment (checked env, no IMMY_* vars) -- same gap PRD-21665's dev leg recorded for its own TC2/TC8; does not block 6b"
+  },
+  {
+    "id": "TC3",
+    "ac": "AC2",
+    "text": "Given the existing clean-run Recorder stub (no error field) for scripts/local/31 and adhoc-script-runs/dx, When immybot_scripts_run is called with confirm=true, Then the result has hadErrors: false and no errors key.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"],
+    "result": "pass",
+    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); asserts result[\"hadErrors\"] is False and \"errors\" not in result"
+  },
+  {
+    "id": "TC4",
+    "ac": "AC2",
+    "text": "Given SOP 263, stored Local script 1 (\"MSPbots VPN stand-in (test)\"), When immybot_scripts_run is called against the live instance with confirm=true, Then the response contains hadErrors: false and no errors key.",
+    "type": "manual",
+    "steps": [
+      "Obtain ImmyBot credentials for the mspbotsai.immy.bot instance (tenant 1)",
+      "Call immybot_scripts_run with scriptId=1, computerId=1, confirm=true",
+      "Inspect the tool result"
+    ],
+    "expect": "hadErrors: false; no errors key present",
+    "result": "untested",
+    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): no mspbotsai.immy.bot credentials in this environment -- same gap PRD-21665's dev leg recorded for its own TC2/TC8; does not block 6b"
+  },
+  {
+    "id": "TC5",
+    "ac": "AC3",
+    "text": "Given the same error-row stub as TC1, When the result is inspected, Then status is exactly the vendor's own terminal status string (Completed), never replaced by Failed or any other derived value.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
+    "result": "pass",
+    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); test asserts result[\"status\"] == \"Completed\" on the error-row stub"
+  },
+  {
+    "id": "TC6",
+    "ac": "AC4",
+    "text": "Given the same stub as TC1, When the request log/recorder is inspected, Then no additional HTTP call beyond the existing scripts/run POST and adhoc-script-runs/dx polling GETs was made to obtain the error text.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
+    "result": "pass",
+    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); test asserts rec.requests paths are a subset of {scripts/local/2, scripts/run, adhoc-script-runs/dx}"
+  },
+  {
+    "id": "TC7",
+    "ac": "AC2",
+    "text": "Given the error-row stub (TC1), which also carries scriptText/scriptPreview, When the result is inspected, Then neither the script's action text nor scriptText/scriptPreview appears anywhere in the result (regression guard for PRD-21665's AC2).",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
+    "result": "pass",
+    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); test asserts SCRIPT[\"action\"] not in json.dumps(result)"
+  }
+]
