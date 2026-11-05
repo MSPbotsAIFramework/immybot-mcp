@@ -1,5 +1,7 @@
 # PRD-21798 · Code review
 
+Status: frozen @ a02bb77
+
 ## Round 1 · 2026-11-05 · reviewed dev/PRD-21798 @ 095776c (base main @ 97d6961)
 
 Verdict: changes requested
@@ -33,3 +35,18 @@ Only finding 1 (must-fix) required a change; findings 2-4 are suggestions, not a
 - The frozen main doc's `Status:` line (line 6) got one explicit note pointing at this Fixes section, per the finding's own instruction to "record the edit and its reason explicitly rather than editing silently" rather than leaving the frozen doc's known-false claim uncorrected. No other line in the main doc changed.
 - **Retest**: `uv run pytest -q` → `538 passed, 11 skipped, 0 failed` (unchanged from the pre-fix baseline recorded in the Self-test section — this round's change is docs-only, no `src/`/`tests/` edits). Full repo Chinese-character scan rerun: `grep -rnP '[\x{4e00}-\x{9fff}]' --exclude-dir=.git --exclude-dir=.venv .` — no longer matches `PRD-21798.md` or `PRD-21798.ac.json`; remaining matches are the pre-existing other-ticket docs already listed in the Self-test row and this review doc's own finding-1 text.
 - Commit: see `Handoff`-equivalent below — `dev/PRD-21798` fix commit sha recorded in the `[DEV]` stub (`Review fixes round 1:` conclusion) once pushed.
+
+## Round 2 · 2026-11-05 · reviewed dev/PRD-21798 @ a02bb77 (base main @ 97d6961)
+
+Verdict: approved
+
+### Findings
+
+None. Checked round-1 Fixes against `git diff 095776c...a02bb77` (docs-only: `docs/tickets/PRD-21798.md`, `docs/tickets/PRD-21798-review.md`):
+
+- Finding 1 (must-fix) is resolved: line 144 now reads "unknown external API", line 188 reads "run it if present"; the Self-test "Chinese-character scan" row was corrected to document the round-1 finding and the re-scan output instead of repeating the false "no match" claim.
+- `grep -nP '[\x{4e00}-\x{9fff}]' docs/tickets/PRD-21798.md docs/tickets/PRD-21798.ac.json` (run directly during this round): the only remaining match is the Self-test row itself quoting the two original Chinese phrases verbatim to document the round-1 finding, as the Fixes note states — not new Chinese content introduced by this ticket's design, code, or tests. `.ac.json` has no match.
+- Findings 2-4 (suggestions) were correctly left unactioned; nothing in round 2 required them to be addressed, and none of them is reclassified as must-fix.
+- No `src/` or `tests/` changes in this round, so round 1's correctness/credentials/tests/tool-signature/README verification still holds unchanged; gates (`uv run pytest -q: 538 passed, 11 skipped, 0 failed`) are unaffected (docs-only diff).
+
+Round 2 is approved with 3 open suggestions (2-4 from round 1, unresolved, non-blocking).
