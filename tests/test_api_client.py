@@ -422,7 +422,7 @@ async def test_script_get_falls_back_to_global(monkeypatch):
     assert [r.url.path for r in rec.requests] == ["/api/v1/scripts/local/31", "/api/v1/scripts/global/31"]
 
 
-def runs(output='["removed 12 files"]', script_id=31, status=2, script_text=None):
+def runs(output='["removed 12 files"]', script_id=31, status=2, script_text=None, error=None):
     """Stub for adhoc-script-runs/dx: empty before the run is queued, one finished run after."""
     state = {"n": 0}
 
@@ -435,6 +435,11 @@ def runs(output='["removed 12 files"]', script_id=31, status=2, script_text=None
             "output": output, "durationMs": 1200,
             "scriptText": script_text or SCRIPT["action"], "scriptPreview": script_text or SCRIPT["action"],
         }
+        if error is not None:
+            # First candidate key in scripts._ERROR_FIELDS: the stub stands in for "the vendor
+            # record, however it is really shaped" and is the one place the field-name assumption
+            # is falsifiable by a later, cheap edit if a live check finds a different real key.
+            row["error"] = error
         return httpx.Response(200, json={"data": [row]})
 
     return reply
@@ -455,6 +460,23 @@ async def test_script_run_needs_confirm_and_replays_script(monkeypatch):
     assert sent["script"]["scriptExecutionContext"] == "CurrentUser" and sent["script"]["variables"] == {}
     assert uuid.UUID(sent["cancellationId"]) and sent["cancellationId"] != "mcp-31-7"
     assert result["output"] == ["removed 12 files"] and result["status"] == "Completed"
+    assert SCRIPT["action"] not in json.dumps(result)
+    assert result["hadErrors"] is False and "errors" not in result
+
+
+async def test_script_run_reports_errors_from_run_record(monkeypatch):
+    rec = Recorder(
+        {"scripts/local/2": SCRIPT | {"id": 2}, "POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(
+            output='["TEST-ERR DEV-W11-01"]', script_id=2, error="TEST-VPN-FAIL simulated error",
+        )}
+    )
+    result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 2, "computerId": 1, "confirm": True})
+    # AC1/AC3: error surfaced, status untouched (never synthesized to "Failed").
+    assert result["hadErrors"] is True and result["errors"] == ["TEST-VPN-FAIL simulated error"]
+    assert result["status"] == "Completed"
+    # AC4: no extra HTTP call beyond the existing scripts/run POST and adhoc-script-runs/dx polling GETs.
+    assert {r.url.path for r in rec.requests} <= {"/api/v1/scripts/local/2", "/api/v1/scripts/run", "/api/v1/adhoc-script-runs/dx"}
+    # PRD-21665 AC2 regression guard: the script body is still never exposed.
     assert SCRIPT["action"] not in json.dumps(result)
 
 
