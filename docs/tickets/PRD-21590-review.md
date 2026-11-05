@@ -21,3 +21,27 @@ Base taken from the Handoff ("Default branch: `main` @ `a5abd1c`"); `origin/main
 - Registration/navigation (TC6): `server.py` import + tuple, `navigation.py` `DOMAINS["persons"]` + `Domain` Literal, `EXPECTED_TOOLS` + count 72. The README tool-count 70 → 72 correction is explained in Self-test (a stale value already on `main`).
 - Tool name, parameters (`tenantId` required, `limit` 1–500 default 50), `READ_ONLY` annotation and returned fields match the Tech design.
 - Reuse: only existing `_common.py` helpers; no new dependency.
+
+### Fixes (round 1)
+
+Only the must-fix item above was changed; no other behavior touched.
+
+1. **`src/immybot_mcp/tools/persons.py:34-40`** (`fcc49e8`'s parent, `8d868e7`) — `action()` now keeps the raw vendor rows (`raw_rows`) separate from the client-side tenant-filtered `rows`, and derives `has_more` from the vendor's `totalCount` (`total > limit`) instead of relying on `listing()`'s default `len(items) > limit`, which can never fire once the request caps the response at `take=<limit>`. Falls back to `len(raw_rows) >= limit` when `totalCount` is absent, mirroring `immybot_maintenance_sessions_list` (`maintenance_sessions.py:110`).
+2. **`tests/test_api_client.py`** (same commit) — `test_persons_list_caps_at_limit_and_sets_has_more`'s stub now honors `take` (returns `rows[:take]` with the real `totalCount`), matching the real vendor's DevExtreme `/dx` contract instead of returning more rows than requested. Added `test_persons_list_no_more_when_total_within_limit` (totalCount == rows returned ⇒ `has_more` False) so the fix is checked both ways, not just flipped to always-True.
+3. **Re-sync required**: `origin/main` had moved from `a5abd1c` (this round's reviewed base) to `445a57a` (PRD-21588's `immybot_computers_set_primary_user` merged in the meantime). Merged clean (`a8db521`), per `mcp-track.md` §3.2 step 6.
+4. **Unplanned fix found by re-running gates after the sync** (`fcc49e8`): the clean, non-conflicting auto-merge of `tests/test_tools.py` and `README.md` left a stale tool-count assertion (`72`) against the actual merged, registered count (`73` — PRD-21588's tool + this ticket's `immybot_persons_list`). `uv run pytest -q` caught it (`test_tool_names_are_stable` failed `73 == 72`); corrected both the assertion and the README "Tool count" line to `73`. Not a must-fix item, but required to keep gates green on the synced code (same discipline the design doc's "unplanned fix" note already documents for the 70→72 case).
+
+**Retest** (`TESTED=fcc49e8`, synced with `main@445a57a`):
+
+| Command | Result |
+|---|---|
+| `uv run pytest -q` | 537 passed, 11 skipped, 0 failed |
+| `uv run pytest -q -k persons -v` | 10 passed (TC1–TC5 incl. the new TC4 case, plus `test_tool_names_are_stable`, `test_required_params[immybot_persons_list]`, `test_navigate_lists_every_tool`) |
+| Local smoke: `uv run python -m immybot_mcp` (port 19590), `GET /health` | `200` |
+| Local smoke: `POST /mcp` `initialize` → `tools/list` with placeholder ImmyBot headers | tool count **73**; `immybot_persons_list` present, `required == ["tenantId"]` |
+| Local smoke: same request, headers omitted | `401` |
+| Chinese-character scan (`src/ tests/ README.md`) | no output (clean) |
+| README Connector section vs `vendor-mcp-development/reference/readme-connector-section.md` | untouched by this fix; still identical (verified round 1) |
+| `gitleaks detect` | not installed in this sandbox; skipped |
+
+`docs/tickets/PRD-21590.ac.json` TC4 and TC6 evidence updated to point at `fcc49e8` and the new test. Main ticket doc (`docs/tickets/PRD-21590.md`, frozen @ `959ac83`) is not edited, per `legs/dev.md` S1.
