@@ -258,6 +258,39 @@ async def test_set_needs_onboarding_invalid_computer(monkeypatch):
     assert result["error"]["retryable"] is False
 
 
+async def test_set_primary_user_minimal_body(monkeypatch):
+    rec = Recorder({"PUT computers/42": {"id": 42, "primaryPersonId": 7, "inventory": {"big": "blob"}}})
+    result = await _call(monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 42, "primaryPersonId": 7})
+    sent = body(rec.calls("computers/42", "PUT")[0])
+    assert sent == {"primaryPersonId": 7, "providerLinkUpdates": []}
+    assert result == {"id": 42, "primaryPersonId": 7}
+
+
+async def test_set_primary_user_includes_onboarding_status(monkeypatch):
+    rec = Recorder({"PUT computers/42": {"id": 42, "primaryPersonId": 7, "onboardingStatus": "Completed"}})
+    await _call(
+        monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 42, "primaryPersonId": 7, "onboardingStatus": "Completed"}
+    )
+    sent = body(rec.calls("computers/42", "PUT")[0])
+    assert sent["onboardingStatus"] == "Completed"
+
+
+async def test_set_primary_user_includes_additional_person_ids(monkeypatch):
+    rec = Recorder({"PUT computers/42": {"id": 42, "primaryPersonId": 7, "additionalPersonIds": [8, 9]}})
+    await _call(
+        monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 42, "primaryPersonId": 7, "additionalPersonIds": [8, 9]}
+    )
+    sent = body(rec.calls("computers/42", "PUT")[0])
+    assert sent["additionalPersonIds"] == [8, 9]
+
+
+async def test_set_primary_user_surfaces_vendor_error(monkeypatch):
+    rec = Recorder({"PUT computers/999": lambda r: httpx.Response(404, json={"error": {"code": "not_found", "message": "Person not found"}})})
+    result = await _call(monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 999, "primaryPersonId": 7})
+    assert result["error"]["code"] == "not_found"
+    assert result["error"]["message"].endswith("Person not found")
+
+
 # ---- deployments -----------------------------------------------------------
 
 ASSIGNMENTS = [
