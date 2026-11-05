@@ -40,6 +40,7 @@ EXPECTED_TOOLS: dict[str, set[str]] = {
     "immybot_computers_trigger_checkin": C,
     "immybot_computers_set_needs_onboarding": C,
     "immybot_computers_delete": {"computerIds"},
+    "immybot_computers_set_primary_user": {"computerId", "primaryPersonId"},
     "immybot_deployments_list": set(),
     "immybot_deployments_get": {"deploymentId"},
     "immybot_deployments_create": {"name", "softwareId", "targetType", "targetId", "desiredState"},
@@ -103,6 +104,7 @@ EXPECTED_TOOLS: dict[str, set[str]] = {
 WRITE_TOOLS = {
     "immybot_computers_trigger_checkin",
     "immybot_computers_set_needs_onboarding",
+    "immybot_computers_set_primary_user",
     "immybot_deployments_create",
     "immybot_maintenance_sessions_cancel",
     "immybot_maintenance_sessions_resume",
@@ -133,7 +135,7 @@ def tools():
 
 def test_tool_names_are_stable(tools):
     assert set(tools) == set(EXPECTED_TOOLS)
-    assert len(tools) == 71
+    assert len(tools) == 72
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_TOOLS))

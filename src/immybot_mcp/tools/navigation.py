@@ -24,7 +24,7 @@ from ._common import LOCAL, READ_ONLY, ClientFactory, run_tool
 
 DOMAINS: dict[str, tuple[str, list[str]]] = {
     "computers": (
-        "Managed computers: find, inspect, inventory, effective deployments, re-inventory.",
+        "Managed computers: find, inspect, inventory, effective deployments, re-inventory, assign a primary user.",
         [
             "immybot_computers_list",
             "immybot_computers_get",
@@ -35,6 +35,7 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
             "immybot_computers_trigger_checkin",
             "immybot_computers_set_needs_onboarding",
             "immybot_computers_delete",
+            "immybot_computers_set_primary_user",
         ],
     ),
     "software": (

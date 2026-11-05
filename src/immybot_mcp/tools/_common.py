@@ -49,6 +49,7 @@ Limit = Annotated[int, Field(description=f"Maximum records to return (max {MAX_L
 PageLimit = Annotated[int, Field(description=f"Records per page (max {MAX_PAGE_LIMIT}).", ge=1, le=MAX_PAGE_LIMIT)]
 Confirm = Annotated[bool | None, Field(description="Must be true, set only after the user approved this exact action.")]
 ComputerId = Annotated[int, Field(description="ImmyBot computer id.", ge=1)]
+PersonId = Annotated[int, Field(description="ImmyBot person id.", ge=1)]
 TenantId = Annotated[int, Field(description="ImmyBot tenant id (not the Entra tenant id).", ge=1)]
 OptionalTenantId = Annotated[int | None, Field(description="Only this ImmyBot tenant id.", ge=1)]
 SessionId = Annotated[int, Field(description="Maintenance session id.", ge=1)]
