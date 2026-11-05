@@ -755,10 +755,29 @@ async def test_persons_list_vendor_error_returns_envelope(monkeypatch):
 
 async def test_persons_list_caps_at_limit_and_sets_has_more(monkeypatch):
     rows = [{"id": i, "firstName": f"Person{i}", "tenantId": 119} for i in range(1, 4)]
-    rec = Recorder({"Persons/dx": {"data": rows, "totalCount": 3}})
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        take = int(request.url.params["take"])
+        return httpx.Response(200, json={"data": rows[:take], "totalCount": len(rows)})
+
+    rec = Recorder({"Persons/dx": reply})
     result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119, "limit": 2})
     assert len(result["persons"]) == 2 and result["has_more"] is True
+    assert result["total"] == 3
     assert rec.requests[0].url.params["take"] == "2"
+
+
+async def test_persons_list_no_more_when_total_within_limit(monkeypatch):
+    rows = [{"id": i, "firstName": f"Person{i}", "tenantId": 119} for i in range(1, 3)]
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        take = int(request.url.params["take"])
+        return httpx.Response(200, json={"data": rows[:take], "totalCount": len(rows)})
+
+    rec = Recorder({"Persons/dx": reply})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119, "limit": 2})
+    assert len(result["persons"]) == 2 and result["has_more"] is False
+    assert result["total"] == 2
 
 
 async def test_persons_list_filters_out_other_tenants_defensively(monkeypatch):

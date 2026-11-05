@@ -33,9 +33,14 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         async def action(client: ImmyBotClient) -> dict:
             params = dx_params(limit, [["tenantId", "=", tenantId]]) | {"requireTotalCount": True}
             payload = await client.get("Persons/dx", params)
-            rows = [r for r in as_list(payload) if isinstance(r, dict)]
-            rows = [r for r in rows if r.get("tenantId") == tenantId]  # the API may not honor the filter; enforce it here
+            raw_rows = [r for r in as_list(payload) if isinstance(r, dict)]
+            rows = [r for r in raw_rows if r.get("tenantId") == tenantId]  # the API may not honor the filter; enforce it here
             total = payload.get("totalCount") if isinstance(payload, dict) else None
-            return listing("persons", [_person(r) for r in rows], limit) | compact({"total": total})
+            # The request already sends take=<limit>, so the vendor returns at most `limit` rows and
+            # len(items) > limit (listing()'s default) can never be true (PRD-21590 review round 1).
+            # Derive has_more from the vendor's total instead, like immybot_maintenance_sessions_list
+            # (maintenance_sessions.py:110) falls back to len(rows) >= limit when total is unavailable.
+            has_more = total > limit if isinstance(total, int) else len(raw_rows) >= limit
+            return listing("persons", [_person(r) for r in rows], limit) | compact({"total": total}) | {"has_more": has_more}
 
         return await run_tool("immybot_persons_list", client_factory, action)
