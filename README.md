@@ -123,6 +123,7 @@ to use instead).
 | Scripts | `immybot_scripts_list` (category, isGlobal, search, language), `_get` (**scriptId**, databaseType), `_search` (**query**), `_categories`, `_validate` (**content**); **confirm**: `_run` (**scriptId**, **computerId**, parameters, timeout, runAs), `_run_adhoc` (**computerId**, **content**, language, name, outputType, parameters, timeout, runAs); **n/a**: `_execution_history`, `_execution_result` |
 | Software | `immybot_software_list_global`, `_list` (isGlobal, search), `_get` (**softwareId**, softwareType), `_search` (**query**), `_versions`, `_latest_version`, `_stats` (**softwareId**); **confirm**: `_install` (**softwareId**, computerIds or tenantId); **n/a**: `_categories`, `_publishers` |
 | Tenants | `immybot_tenants_list` (search, status), `_get`, `_search` (**query**), `_stats`, `_computers`, `_deployments`, `_compliance`, `_software_inventory` (all **tenantId**) |
+| Persons | `immybot_persons_list` (**tenantId**, limit) |
 | Tasks | **n/a**: all 15 `immybot_tasks_*` tools (ImmyBot has no task queue; use maintenance sessions) |
 
 Errors come back as a JSON envelope instead of an exception:
@@ -185,7 +186,7 @@ uv run pytest
 
 ## Delivery notes
 
-- **Tool count (72).** Kept as is because the tool names are an existing contract.
+- **Tool count (73).** Kept as is because the tool names are an existing contract.
 - **Token scope fixed.** ImmyBot's Entra application uses the instance URL as its App ID URI,
   so the token scope is `https://{subdomain}.immy.bot/.default`. Older versions requested
   `api://{client_id}/.default`, a token ImmyBot does not accept.

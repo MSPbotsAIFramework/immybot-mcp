@@ -100,6 +100,7 @@ EXPECTED_TOOLS: dict[str, set[str]] = {
     "immybot_tenants_deployments": T,
     "immybot_tenants_compliance": T,
     "immybot_tenants_software_inventory": T,
+    "immybot_persons_list": T,
 }
 WRITE_TOOLS = {
     "immybot_computers_trigger_checkin",
@@ -135,7 +136,7 @@ def tools():
 
 def test_tool_names_are_stable(tools):
     assert set(tools) == set(EXPECTED_TOOLS)
-    assert len(tools) == 72
+    assert len(tools) == 73
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_TOOLS))
