@@ -24,7 +24,7 @@ from ._common import LOCAL, READ_ONLY, ClientFactory, run_tool
 
 DOMAINS: dict[str, tuple[str, list[str]]] = {
     "computers": (
-        "Managed computers: find, inspect, inventory, effective deployments, re-inventory.",
+        "Managed computers: find, inspect, inventory, effective deployments, re-inventory, assign a primary user.",
         [
             "immybot_computers_list",
             "immybot_computers_get",
@@ -35,6 +35,7 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
             "immybot_computers_trigger_checkin",
             "immybot_computers_set_needs_onboarding",
             "immybot_computers_delete",
+            "immybot_computers_set_primary_user",
         ],
     ),
     "software": (
@@ -91,6 +92,10 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
             "immybot_tenants_software_inventory",
         ],
     ),
+    "persons": (
+        "Persons (users) in a tenant, e.g. to pick a primary user.",
+        ["immybot_persons_list"],
+    ),
     "maintenance_sessions": (
         "Maintenance sessions: list, start, cancel, resume, logs, per-item results, status counts.",
         [
@@ -128,7 +133,7 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
     ),
 }
 
-Domain = Literal["computers", "software", "deployments", "scripts", "tenants", "maintenance_sessions", "tasks"]
+Domain = Literal["computers", "software", "deployments", "scripts", "tenants", "maintenance_sessions", "tasks", "persons"]
 
 
 def register(mcp: FastMCP, client_factory: ClientFactory) -> None:

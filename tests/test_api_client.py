@@ -258,6 +258,39 @@ async def test_set_needs_onboarding_invalid_computer(monkeypatch):
     assert result["error"]["retryable"] is False
 
 
+async def test_set_primary_user_minimal_body(monkeypatch):
+    rec = Recorder({"PUT computers/42": {"id": 42, "primaryPersonId": 7, "inventory": {"big": "blob"}}})
+    result = await _call(monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 42, "primaryPersonId": 7})
+    sent = body(rec.calls("computers/42", "PUT")[0])
+    assert sent == {"primaryPersonId": 7, "providerLinkUpdates": []}
+    assert result == {"id": 42, "primaryPersonId": 7}
+
+
+async def test_set_primary_user_includes_onboarding_status(monkeypatch):
+    rec = Recorder({"PUT computers/42": {"id": 42, "primaryPersonId": 7, "onboardingStatus": "Completed"}})
+    await _call(
+        monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 42, "primaryPersonId": 7, "onboardingStatus": "Completed"}
+    )
+    sent = body(rec.calls("computers/42", "PUT")[0])
+    assert sent["onboardingStatus"] == "Completed"
+
+
+async def test_set_primary_user_includes_additional_person_ids(monkeypatch):
+    rec = Recorder({"PUT computers/42": {"id": 42, "primaryPersonId": 7, "additionalPersonIds": [8, 9]}})
+    await _call(
+        monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 42, "primaryPersonId": 7, "additionalPersonIds": [8, 9]}
+    )
+    sent = body(rec.calls("computers/42", "PUT")[0])
+    assert sent["additionalPersonIds"] == [8, 9]
+
+
+async def test_set_primary_user_surfaces_vendor_error(monkeypatch):
+    rec = Recorder({"PUT computers/999": lambda r: httpx.Response(404, json={"error": {"code": "not_found", "message": "Person not found"}})})
+    result = await _call(monkeypatch, rec, "immybot_computers_set_primary_user", {"computerId": 999, "primaryPersonId": 7})
+    assert result["error"]["code"] == "not_found"
+    assert result["error"]["message"].endswith("Person not found")
+
+
 # ---- deployments -----------------------------------------------------------
 
 ASSIGNMENTS = [
@@ -742,3 +775,68 @@ async def test_script_validate_language_normalized_or_passed_through(monkeypatch
     rec = Recorder({"POST scripts/syntax-check": {"isSyntaxValid": True}})
     await _call(monkeypatch, rec, "immybot_scripts_validate", {"content": "x", "language": given})
     assert body(rec.requests[0])["scriptLanguage"] == sent
+
+
+# ---- persons ----------------------------------------------------------------
+
+
+async def test_persons_list_returns_fields_for_tenant(monkeypatch):
+    rows = [
+        {"id": 1, "firstName": "Ada", "lastName": "Lovelace", "emailAddress": "ada@example.com", "tenantId": 119, "azureId": "aaa-1"},
+        {"id": 2, "firstName": "Grace", "lastName": "Hopper", "emailAddress": "grace@example.com", "tenantId": 119, "azureId": "aaa-2"},
+    ]
+    rec = Recorder({"Persons/dx": {"data": rows, "totalCount": 2}})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119})
+    params = rec.requests[0].url.params
+    assert json.loads(params["filter"]) == ["tenantId", "=", 119]
+    assert params["requireTotalCount"] == "true"
+    assert result["persons"] == rows
+    assert result["count"] == 2 and result["total"] == 2
+
+
+async def test_persons_list_empty_tenant_returns_empty_list(monkeypatch):
+    rec = Recorder({"Persons/dx": {"data": [], "totalCount": 0}})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119})
+    assert result["persons"] == [] and result["count"] == 0
+    assert "error" not in result
+
+
+async def test_persons_list_vendor_error_returns_envelope(monkeypatch):
+    rec = Recorder({"Persons/dx": lambda r: httpx.Response(404, json={"error": {"code": "not_found", "message": "Tenant not found", "details": None}})})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 999})
+    assert result["error"]["code"] == "not_found"
+    assert result["error"]["message"].endswith("Tenant not found")
+
+
+async def test_persons_list_caps_at_limit_and_sets_has_more(monkeypatch):
+    rows = [{"id": i, "firstName": f"Person{i}", "tenantId": 119} for i in range(1, 4)]
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        take = int(request.url.params["take"])
+        return httpx.Response(200, json={"data": rows[:take], "totalCount": len(rows)})
+
+    rec = Recorder({"Persons/dx": reply})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119, "limit": 2})
+    assert len(result["persons"]) == 2 and result["has_more"] is True
+    assert result["total"] == 3
+    assert rec.requests[0].url.params["take"] == "2"
+
+
+async def test_persons_list_no_more_when_total_within_limit(monkeypatch):
+    rows = [{"id": i, "firstName": f"Person{i}", "tenantId": 119} for i in range(1, 3)]
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        take = int(request.url.params["take"])
+        return httpx.Response(200, json={"data": rows[:take], "totalCount": len(rows)})
+
+    rec = Recorder({"Persons/dx": reply})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119, "limit": 2})
+    assert len(result["persons"]) == 2 and result["has_more"] is False
+    assert result["total"] == 2
+
+
+async def test_persons_list_filters_out_other_tenants_defensively(monkeypatch):
+    rows = [{"id": 1, "firstName": "Ada", "tenantId": 119}, {"id": 2, "firstName": "Other", "tenantId": 5}]
+    rec = Recorder({"Persons/dx": {"data": rows, "totalCount": 2}})
+    result = await _call(monkeypatch, rec, "immybot_persons_list", {"tenantId": 119})
+    assert [p["id"] for p in result["persons"]] == [1]

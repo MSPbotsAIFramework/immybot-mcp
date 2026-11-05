@@ -1,0 +1,63 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC1",
+    "text": "Given a Recorder stub for Persons/dx returning 2 persons for tenantId=119 with all six fields populated, When immybot_persons_list(tenantId=119) is called, Then the outbound request's filter query parameter JSON-decodes to [\"tenantId\", \"=\", 119], requireTotalCount is \"true\", and the result contains exactly those 2 persons with id/firstName/lastName/emailAddress/tenantId/azureId for each.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_returns_fields_for_tenant"],
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83 (synced with main@a5abd1c): test_persons_list_returns_fields_for_tenant PASSED. Asserted filter decodes to [\"tenantId\",\"=\",119], requireTotalCount==\"true\", result[\"persons\"]==rows (both stubbed persons, all six fields), result[\"total\"]==2."
+  },
+  {
+    "id": "TC2",
+    "ac": "AC2",
+    "text": "Given a Recorder stub for Persons/dx returning zero rows for tenantId=119, When immybot_persons_list(tenantId=119) is called, Then the result is an empty persons list with count: 0 and no error.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_empty_tenant_returns_empty_list"],
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83: test_persons_list_empty_tenant_returns_empty_list PASSED. Asserted result[\"persons\"]==[] and result[\"count\"]==0 and no \"error\" key."
+  },
+  {
+    "id": "TC3",
+    "ac": "AC3",
+    "text": "Given a Recorder stub returning an ImmyBot error response (HTTP 404) for Persons/dx, When immybot_persons_list(tenantId=<id>) is called, Then the tool returns the standard structured error envelope, not an unhandled exception.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_vendor_error_returns_envelope"],
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83: test_persons_list_vendor_error_returns_envelope PASSED. Stubbed a 404 with {\"error\":{\"code\":\"not_found\",\"message\":\"Tenant not found\"}}; asserted result[\"error\"][\"code\"]==\"not_found\" and message ends with \"Tenant not found\" (via the shared ImmyBotError -> error_envelope() path every other tool uses)."
+  },
+  {
+    "id": "TC4",
+    "ac": "AC4",
+    "text": "Given a Recorder stub for Persons/dx returning 3 rows for tenantId=119, When immybot_persons_list(tenantId=119, limit=2) is called, Then the result contains exactly 2 persons and has_more is true.",
+    "type": "auto",
+    "tests": [
+      "tests/test_api_client.py::test_persons_list_caps_at_limit_and_sets_has_more",
+      "tests/test_api_client.py::test_persons_list_no_more_when_total_within_limit"
+    ],
+    "result": "pass",
+    "evidence": "Round 1 fix (see PRD-21590-review.md): the original stub ignored take and always returned 3 rows, so has_more came out True via listing()'s len(items)>limit default even though that default can never be True against the real vendor (take=<limit> caps the response). persons.py now derives has_more from the vendor's totalCount (total > limit), falling back to len(raw_rows) >= limit like maintenance_sessions.py:110. uv run pytest -k persons -v on TESTED=fcc49e8 (synced with main@445a57a): test_persons_list_caps_at_limit_and_sets_has_more PASSED with a take-honoring stub (returns rows[:take], totalCount=3) -- take=2 request gets back exactly 2 rows, has_more True because total(3) > limit(2); new test_persons_list_no_more_when_total_within_limit PASSED -- take=2 request where totalCount==2 (all rows returned) asserts has_more False, proving the fix does not just flip to always-True."
+  },
+  {
+    "id": "TC5",
+    "ac": "AC5",
+    "text": "Given a Recorder stub for Persons/dx that returns one row for tenantId=119 and one row for a different tenantId, When immybot_persons_list(tenantId=119) is called, Then only the matching tenant's row is present in the result.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_persons_list_filters_out_other_tenants_defensively"],
+    "result": "pass",
+    "evidence": "uv run pytest -k persons -v on TESTED=959ac83: test_persons_list_filters_out_other_tenants_defensively PASSED. Stub returned one row for tenantId=119 and one for tenantId=5; called with tenantId=119; only id=1 (tenantId=119) came back. Mirrors the defensive tenantId re-filter already used by immybot_computers_list (computers.py:75)."
+  },
+  {
+    "id": "TC6",
+    "ac": "registration/navigation regression",
+    "text": "Given the server built via create_mcp_server(), When tools/list is read, Then immybot_persons_list is present with required parameter {tenantId}, the total tool count is 69, and immybot_navigate(domain=\"persons\") lists immybot_persons_list.",
+    "type": "auto",
+    "tests": [
+      "tests/test_tools.py::test_tool_names_are_stable",
+      "tests/test_tools.py::test_required_params",
+      "tests/test_tools.py::test_navigate_lists_every_tool"
+    ],
+    "result": "pass",
+    "evidence": "Round 1: uv run pytest -q on TESTED=959ac83: 528 passed. Round 1 fix: dev/PRD-21590 was re-synced with main (now at 445a57a, which had meanwhile merged PRD-21588's immybot_computers_set_primary_user) before re-running gates for the has_more fix; the merge auto-resolved test_tools.py and README.md textually but silently left both sides' tool-count bumps colliding at a stale 72 against an actual registered count of 73 -- caught by uv run pytest -q on TESTED=fcc49e8 (synced with main@445a57a): 537 passed, 11 skipped, 0 failed, including test_tool_names_are_stable (now asserting 73), test_required_params[immybot_persons_list], and test_navigate_lists_every_tool. README's \"Tool count\" line corrected 72 -> 73 in the same fix. This does not weaken AC6: the check is still that the new tool is present, reachable via the \"persons\" domain, and the total matches the actual registered set -- confirmed live via a local tools/list call on TESTED=fcc49e8 (port 19590) returning exactly 73 tools including immybot_persons_list with required {tenantId}, and a 401 when the four X-Immybot-* headers are omitted."
+  }
+]
