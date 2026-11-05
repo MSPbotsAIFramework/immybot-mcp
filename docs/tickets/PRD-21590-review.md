@@ -45,3 +45,28 @@ Only the must-fix item above was changed; no other behavior touched.
 | `gitleaks detect` | not installed in this sandbox; skipped |
 
 `docs/tickets/PRD-21590.ac.json` TC4 and TC6 evidence updated to point at `fcc49e8` and the new test. Main ticket doc (`docs/tickets/PRD-21590.md`, frozen @ `959ac83`) is not edited, per `legs/dev.md` S1.
+
+## Round 2 · 2026-11-05 · reviewed dev/PRD-21590 @ 8869d0f (base main @ 445a57a)
+
+Status: frozen @ 8869d0f
+
+Verdict: approved
+
+Scope: the two non-merge commits since round 1 (`8d868e7`, `fcc49e8`) plus the docs commit (`8869d0f`); `a8db521` is a clean merge of `origin/main` (PRD-21588's `immybot_computers_set_primary_user`) carrying no PRD-21590 changes, so its content (`navigation.py`, `_common.py`, `computers.py`, PRD-21588 docs) is out of scope for this review.
+
+### Round 1 fixes verified
+1. `src/immybot_mcp/tools/persons.py:34-40` (`8d868e7`) — `has_more` is now `total > limit if isinstance(total, int) else len(raw_rows) >= limit`, overriding `listing()`'s default via the trailing `| {"has_more": has_more}` merge. Matches the `immybot_maintenance_sessions_list` (`maintenance_sessions.py:110`) pattern the must-fix pointed at. Checked the arithmetic against both new tests: `total=3, limit=2` → `has_more=True` (`test_persons_list_caps_at_limit_and_sets_has_more`); `total=2, limit=2` → `has_more=False` (`test_persons_list_no_more_when_total_within_limit`) — the fix is exercised both ways, not just flipped to always-`True`.
+2. `tests/test_api_client.py` (`8d868e7`) — `test_persons_list_caps_at_limit_and_sets_has_more`'s stub now honors `take` (`reply()` returns `rows[:take]` with the real `totalCount`), so it exercises the real vendor shape instead of the impossible always-3-rows response round 1 flagged.
+3. Unplanned fix (`fcc49e8`) is legitimate, not scope creep: it repairs a silent tool-count collision (`72` vs the actual merged `73`) that the required main re-sync (step above) introduced; `uv run pytest -q` caught it before gates, consistent with `mcp-track.md` §3.2 step 7 discipline.
+
+### Findings
+None (no new must-fix; round 1's suggestion #2 on `docs/tickets/PRD-21590.md:232` stands as a repo-wide follow-up, not blocking here).
+
+### Checked, no finding
+- Credentials, multi-tenant isolation, error envelope, tool registration/navigation, Tech design conformance, reuse: unchanged since round 1 (the fix only touches the `has_more` derivation), still hold.
+- `docs/tickets/PRD-21590.ac.json` ledger validates (`ticket_store.py validate`: 6 cases OK); TC4/TC6 evidence updated to `fcc49e8`/`main@445a57a` and matches the retest table above.
+- Chinese-character scan (`src/ tests/ README.md`): clean.
+- README Connector section: untouched by round 1 fixes, still identical to `vendor-mcp-development/reference/readme-connector-section.md`.
+- No SOP §14 item regressed by this round's changes (no new dependency, no new credential path, no cross-repo header change).
+
+Not re-run: the retest table in "Fixes (round 1)" above (`TESTED=fcc49e8`, 537 passed / 11 skipped / 0 failed) already covers this exact code; nothing changed between `fcc49e8` and `8869d0f` (docs-only commit).
