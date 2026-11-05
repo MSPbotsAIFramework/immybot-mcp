@@ -136,7 +136,7 @@ def tools():
 
 def test_tool_names_are_stable(tools):
     assert set(tools) == set(EXPECTED_TOOLS)
-    assert len(tools) == 72
+    assert len(tools) == 73
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_TOOLS))

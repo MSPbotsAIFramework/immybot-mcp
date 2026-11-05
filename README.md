@@ -186,7 +186,7 @@ uv run pytest
 
 ## Delivery notes
 
-- **Tool count (72).** Kept as is because the tool names are an existing contract.
+- **Tool count (73).** Kept as is because the tool names are an existing contract.
 - **Token scope fixed.** ImmyBot's Entra application uses the instance URL as its App ID URI,
   so the token scope is `https://{subdomain}.immy.bot/.default`. Older versions requested
   `api://{client_id}/.default`, a token ImmyBot does not accept.
