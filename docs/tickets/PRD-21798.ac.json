@@ -2,15 +2,17 @@
   {
     "id": "TC1",
     "ac": "AC1",
+    "dw": "DW1",
     "text": "Given a Recorder stub for scripts/local/2 and adhoc-script-runs/dx whose row carries an error field, When immybot_scripts_run(scriptId=2, computerId=1, confirm=true) is called, Then the result has hadErrors: true, errors containing the stubbed error text, and status == \"Completed\" (unchanged).",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
     "result": "pass",
-    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9, synced with main @ 97d6961); full suite uv run pytest -q -> 538 passed, 11 skipped, 0 failed"
+    "evidence": "2026-11-10 dev selftest (rework r2), code dev/PRD-21798 @ 5d80f20, synced with main @ ce150a2: uv run pytest -q tests/test_api_client.py -k script_run -v -> 13 passed, 0 failed; full suite tdd.py run --label final -> 545 passed, 11 skipped, 0 failed (baseline 538 passed/11 skipped; tdd.py diff baseline->final new_failures=0). test_script_run_reports_errors_from_run_record: /dx stub row carries errorsJson='[\"TEST-VPN-FAIL simulated error\"]' (scriptId=2, computerId=1, confirm=true) and the test asserts result hadErrors is True and errors == [\"TEST-VPN-FAIL simulated error\"]."
   },
   {
     "id": "TC2",
     "ac": "AC1",
+    "dw": "DW1",
     "text": "Given SOP 263, computer DEV-W11-01 (computerId=1), stored Local script 2 (\"MSPbots test - error\"), When an agent calls immybot_scripts_run(scriptId=2, computerId=1, confirm=true) against the live mspbotsai.immy.bot instance, Then the response contains hadErrors: true and errors containing the text TEST-VPN-FAIL simulated error (or the literal text the live record carries).",
     "type": "manual",
     "steps": [
@@ -20,20 +22,22 @@
     ],
     "expect": "hadErrors: true; errors contains the thrown exception text; status is still ImmyBot's own value (e.g. Completed)",
     "result": "untested",
-    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): no mspbotsai.immy.bot credentials in this environment (checked env, no IMMY_* vars) -- same gap PRD-21665's dev leg recorded for its own TC2/TC8; does not block 6b"
+    "evidence": "untested - needs a real vendor account (mcp-track.md vendor MCP rule, does not block 6b): no mspbotsai.immy.bot credentials in this environment (no IMMY_* env vars). Field basis this round: ImmyBot's own web bundle https://mspbotsai.immy.bot/assets/index-CjW3kQrC.js (local copy scratch/PRD-21798/dl/index.js) - AdhocScriptRunDetailPanel computes hasErrors from detail.errorsJson (JSON.parse, array length > 0) and renders it in the Errors panel; detail is loaded by AdhocScriptRunsApi.getById -> GET /api/v1/adhoc-script-runs/${id} with params {createdAt}; 'errorsJson' occurs exactly 2 times in the bundle, both in that detail panel, none in the adhoc-script-runs/dx grid. Why QA-NIGHT run add42035-7795-46ac-b529-2c8591f23d22 failed on main @ ce150a2: the code read only the guessed /dx row keys error/errorOutput/exceptionMessage/exception, which the live /dx row does not carry, so hadErrors was false. Offline counterpart: test_script_run_reads_errors_from_run_detail_when_grid_row_lacks_them passes (see TC8)."
   },
   {
     "id": "TC3",
     "ac": "AC2",
+    "dw": "DW2",
     "text": "Given the existing clean-run Recorder stub (no error field) for scripts/local/31 and adhoc-script-runs/dx, When immybot_scripts_run is called with confirm=true, Then the result has hadErrors: false and no errors key.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"],
     "result": "pass",
-    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); asserts result[\"hadErrors\"] is False and \"errors\" not in result"
+    "evidence": "2026-11-10 dev selftest (rework r2), code dev/PRD-21798 @ 5d80f20, synced with main @ ce150a2: uv run pytest -q tests/test_api_client.py -k script_run -v -> 13 passed, 0 failed; full suite tdd.py run --label final -> 545 passed, 11 skipped, 0 failed (baseline 538 passed/11 skipped; tdd.py diff baseline->final new_failures=0). test_script_run_needs_confirm_and_replays_script asserts result hadErrors is False and 'errors' not in result. Note: this clean /dx stub row has no errorsJson, so the code GETs adhoc-script-runs/run-2 for the run record; the Recorder's default reply there is 200 {} (no errorsJson) -> parsed as no errors. Shape coverage: test_script_run_errors_json_shapes[None and '[]'] -> hadErrors false, no errors key (passed)."
   },
   {
     "id": "TC4",
     "ac": "AC2",
+    "dw": "DW2",
     "text": "Given SOP 263, stored Local script 1 (\"MSPbots VPN stand-in (test)\"), When immybot_scripts_run is called against the live instance with confirm=true, Then the response contains hadErrors: false and no errors key.",
     "type": "manual",
     "steps": [
@@ -43,33 +47,52 @@
     ],
     "expect": "hadErrors: false; no errors key present",
     "result": "untested",
-    "evidence": "needs a real vendor account (mcp-track.md 2.5/3): no mspbotsai.immy.bot credentials in this environment -- same gap PRD-21665's dev leg recorded for its own TC2/TC8; does not block 6b"
+    "evidence": "untested - needs a real vendor account (mcp-track.md vendor MCP rule, does not block 6b): no mspbotsai.immy.bot credentials in this environment (no IMMY_* env vars). Field basis this round: ImmyBot's own web bundle https://mspbotsai.immy.bot/assets/index-CjW3kQrC.js (local copy scratch/PRD-21798/dl/index.js) - AdhocScriptRunDetailPanel computes hasErrors from detail.errorsJson (JSON.parse, array length > 0) and renders it in the Errors panel; detail is loaded by AdhocScriptRunsApi.getById -> GET /api/v1/adhoc-script-runs/${id} with params {createdAt}; 'errorsJson' occurs exactly 2 times in the bundle, both in that detail panel, none in the adhoc-script-runs/dx grid. Why QA-NIGHT run add42035-7795-46ac-b529-2c8591f23d22 failed on main @ ce150a2: the code read only the guessed /dx row keys error/errorOutput/exceptionMessage/exception, which the live /dx row does not carry, so hadErrors was false. Offline counterpart: test_script_run_errors_json_shapes (errorsJson null / '[]' -> hadErrors false, no errors key) passes."
   },
   {
     "id": "TC5",
     "ac": "AC3",
+    "dw": "DW1",
     "text": "Given the same error-row stub as TC1, When the result is inspected, Then status is exactly the vendor's own terminal status string (Completed), never replaced by Failed or any other derived value.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
     "result": "pass",
-    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); test asserts result[\"status\"] == \"Completed\" on the error-row stub"
+    "evidence": "2026-11-10 dev selftest (rework r2), code dev/PRD-21798 @ 5d80f20, synced with main @ ce150a2: uv run pytest -q tests/test_api_client.py -k script_run -v -> 13 passed, 0 failed; full suite tdd.py run --label final -> 545 passed, 11 skipped, 0 failed (baseline 538 passed/11 skipped; tdd.py diff baseline->final new_failures=0). test_script_run_reports_errors_from_run_record asserts result status == \"Completed\" on the error stub (status 2 -> Completed, not replaced by Failed); the r2 detail-path and shape tests also assert status == \"Completed\"."
   },
   {
     "id": "TC6",
     "ac": "AC4",
+    "dw": "DW1",
     "text": "Given the same stub as TC1, When the request log/recorder is inspected, Then no additional HTTP call beyond the existing scripts/run POST and adhoc-script-runs/dx polling GETs was made to obtain the error text.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
     "result": "pass",
-    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); test asserts rec.requests paths are a subset of {scripts/local/2, scripts/run, adhoc-script-runs/dx}"
+    "evidence": "2026-11-10 dev selftest (rework r2), code dev/PRD-21798 @ 5d80f20, synced with main @ ce150a2: uv run pytest -q tests/test_api_client.py -k script_run -v -> 13 passed, 0 failed. test_script_run_reports_errors_from_run_record asserts the request paths are a subset of {/api/v1/scripts/local/2, /api/v1/scripts/run, /api/v1/adhoc-script-runs/dx}; in this stub the /dx row carries errorsJson, so _run_errors uses it directly and makes no extra request - judged as the test is written. Disclosure for review: when a real /dx row lacks errorsJson (as on the live instance, see TC8), the code makes one extra GET adhoc-script-runs/{id}?createdAt=... per finished run - the endpoint ImmyBot's own web app uses (AdhocScriptRunsApi.getById, vendor bundle evidence). AC4's intent was to stop inventing unverified endpoints; whether this vendor-evidenced extra call satisfies AC4 is for the reviewer to judge. Case text not changed."
   },
   {
     "id": "TC7",
     "ac": "AC2",
+    "dw": "DW1",
     "text": "Given the error-row stub (TC1), which also carries scriptText/scriptPreview, When the result is inspected, Then neither the script's action text nor scriptText/scriptPreview appears anywhere in the result (regression guard for PRD-21665's AC2).",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
     "result": "pass",
-    "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); test asserts SCRIPT[\"action\"] not in json.dumps(result)"
+    "evidence": "2026-11-10 dev selftest (rework r2), code dev/PRD-21798 @ 5d80f20, synced with main @ ce150a2: uv run pytest -q tests/test_api_client.py -k script_run -v -> 13 passed, 0 failed. test_script_run_reports_errors_from_run_record asserts SCRIPT[\"action\"] not in json.dumps(result) while the /dx row carries scriptText/scriptPreview; test_script_run_reads_errors_from_run_detail_when_grid_row_lacks_them additionally asserts consoleText from the run record is not in the result."
+  },
+  {
+    "id": "TC8",
+    "ac": "AC1",
+    "dw": "DW1",
+    "text": "Given the real ImmyBot run add42035-7795-46ac-b529-2c8591f23d22 on DEV-W11-01 (script 2, computerId=1), which QA-NIGHT confirmed is a real thrown-exception run that still returned hadErrors: false, When immybot_scripts_run(scriptId=2, computerId=1, confirm=true) is called again against the live mspbotsai.immy.bot instance after a fix, Then the response contains hadErrors: true and errors containing the thrown exception text, using a field confirmed from a live row or the instance's own swagger schema -- not another untested addition to the candidate whitelist.",
+    "type": "manual",
+    "steps": [
+      "Obtain ImmyBot credentials for the mspbotsai.immy.bot instance (tenant 1, SOP 263)",
+      "Run Local script 2 (\"MSPbots test - error\") on computer 1 (DEV-W11-01) via immybot_scripts_run(scriptId=2, computerId=1, runAs=System, timeout=90, confirm=true)",
+      "If hadErrors is still false, pull the raw adhoc-script-runs/dx row for that run (or GET /swagger/v1/swagger.json) to identify the real field carrying the error text, and update the detection logic in scripts.py to read it",
+      "Re-run the same call and confirm hadErrors: true and errors contains the thrown text"
+    ],
+    "expect": "hadErrors: true; errors contains the exception text; status stays the vendor's own terminal value (e.g. Completed)",
+    "result": "untested",
+    "evidence": "untested - needs a real vendor account (mcp-track.md vendor MCP rule, does not block 6b): no mspbotsai.immy.bot credentials in this environment (no IMMY_* env vars). Field basis this round: ImmyBot's own web bundle https://mspbotsai.immy.bot/assets/index-CjW3kQrC.js (local copy scratch/PRD-21798/dl/index.js) - AdhocScriptRunDetailPanel computes hasErrors from detail.errorsJson (JSON.parse, array length > 0) and renders it in the Errors panel; detail is loaded by AdhocScriptRunsApi.getById -> GET /api/v1/adhoc-script-runs/${id} with params {createdAt}; 'errorsJson' occurs exactly 2 times in the bundle, both in that detail panel, none in the adhoc-script-runs/dx grid. Why QA-NIGHT run add42035-7795-46ac-b529-2c8591f23d22 failed on main @ ce150a2: the code read only the guessed /dx row keys error/errorOutput/exceptionMessage/exception, which the live /dx row does not carry, so hadErrors was false. Detection now reads errorsJson (row if present, else GET adhoc-script-runs/{id}?createdAt=...), not another candidate-name whitelist. Offline counterparts (2026-11-10 dev selftest (rework r2), code dev/PRD-21798 @ 5d80f20, synced with main @ ce150a2, all passed in 'uv run pytest -q tests/test_api_client.py -k script_run -v -> 13 passed, 0 failed'): test_script_run_reads_errors_from_run_detail_when_grid_row_lacks_them (/dx row without any error field, detail errorsJson=[{Exception:{Message:'TEST-VPN-FAIL simulated error'}}] -> hadErrors true, errors ['TEST-VPN-FAIL simulated error'], status Completed, output ['TEST-ERR DEV-W11-01']); test_script_run_errors_json_shapes (null, '[]', plain string, lower-case message, non-JSON); test_script_run_detail_failure_is_reported_not_hidden (detail 403 -> errorsUnavailable true, no hadErrors). Live confirmation still requires re-running script 2 on DEV-W11-01 with real credentials."
   }
 ]

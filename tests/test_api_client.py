@@ -469,13 +469,16 @@ def runs(output='["removed 12 files"]', script_id=31, status=2, script_text=None
             "scriptText": script_text or SCRIPT["action"], "scriptPreview": script_text or SCRIPT["action"],
         }
         if error is not None:
-            # First candidate key in scripts._ERROR_FIELDS: the stub stands in for "the vendor
-            # record, however it is really shaped" and is the one place the field-name assumption
-            # is falsifiable by a later, cheap edit if a live check finds a different real key.
-            row["error"] = error
+            # errorsJson: the JSON-encoded error list ImmyBot's own run-detail panel reads (PRD-21798 r2).
+            row["errorsJson"] = json.dumps([error])
         return httpx.Response(200, json={"data": [row]})
 
     return reply
+
+
+def run_detail(errors_json):
+    """Stub for adhoc-script-runs/{id}: the per-run record that carries errorsJson."""
+    return lambda request: httpx.Response(200, json={"id": "run-2", "consoleText": "TEST-ERR DEV-W11-01", "errorsJson": errors_json})
 
 
 async def test_script_run_needs_confirm_and_replays_script(monkeypatch):
@@ -511,6 +514,63 @@ async def test_script_run_reports_errors_from_run_record(monkeypatch):
     assert {r.url.path for r in rec.requests} <= {"/api/v1/scripts/local/2", "/api/v1/scripts/run", "/api/v1/adhoc-script-runs/dx"}
     # PRD-21665 AC2 regression guard: the script body is still never exposed.
     assert SCRIPT["action"] not in json.dumps(result)
+
+
+async def test_script_run_reads_errors_from_run_detail_when_grid_row_lacks_them(monkeypatch):
+    # PRD-21798 r2 / TC8: the live /dx grid row carried no error field at all (QA-NIGHT run add42035);
+    # ImmyBot's web app reads errors from errorsJson on GET adhoc-script-runs/{id}?createdAt=...
+    error = {"Exception": {"Message": "TEST-VPN-FAIL simulated error"}, "CategoryInfo": "OperationStopped"}
+    rec = Recorder(
+        {
+            "scripts/local/2": SCRIPT | {"id": 2},
+            "POST scripts/run": lambda r: httpx.Response(202),
+            "adhoc-script-runs/dx": runs(output='["TEST-ERR DEV-W11-01"]', script_id=2),
+            "adhoc-script-runs/run-2": run_detail(json.dumps([error])),
+        }
+    )
+    result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 2, "computerId": 1, "confirm": True})
+    assert result["hadErrors"] is True and result["errors"] == ["TEST-VPN-FAIL simulated error"]
+    assert result["status"] == "Completed" and result["output"] == ["TEST-ERR DEV-W11-01"]
+    assert "consoleText" not in json.dumps(result) and SCRIPT["action"] not in json.dumps(result)
+
+
+@pytest.mark.parametrize(
+    ("errors_json", "expected"),
+    [
+        (None, None),
+        ("[]", None),
+        ('["plain text"]', ["plain text"]),
+        ('[{"message": "lower-case message"}]', ["lower-case message"]),
+        ("not json", ["not json"]),
+    ],
+)
+async def test_script_run_errors_json_shapes(monkeypatch, errors_json, expected):
+    rec = Recorder(
+        {
+            "scripts/local/31": SCRIPT,
+            "POST scripts/run": lambda r: httpx.Response(202),
+            "adhoc-script-runs/dx": runs(),
+            "adhoc-script-runs/run-2": run_detail(errors_json),
+        }
+    )
+    result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "confirm": True})
+    assert result["hadErrors"] is bool(expected) and result.get("errors") == expected
+    assert result["status"] == "Completed"
+
+
+async def test_script_run_detail_failure_is_reported_not_hidden(monkeypatch):
+    rec = Recorder(
+        {
+            "scripts/local/31": SCRIPT,
+            "POST scripts/run": lambda r: httpx.Response(202),
+            "adhoc-script-runs/dx": runs(),
+            "adhoc-script-runs/run-2": lambda r: httpx.Response(403, json={"message": "forbidden"}),
+        }
+    )
+    result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "confirm": True})
+    # The script already ran: the tool still answers, but never claims a clean run it could not check.
+    assert result["done"] is True and result["status"] == "Completed"
+    assert "hadErrors" not in result and result["errorsUnavailable"]
 
 
 async def test_script_run_executes_global_script(monkeypatch):
@@ -652,6 +712,8 @@ async def test_script_run_reports_a_run_that_never_finishes(monkeypatch):
     rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(status=1)})
     result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "timeout": 1, "confirm": True})
     assert result["done"] is True and result["timed_out"] is True and result["status"] == "Running"
+    # PRD-21798 r2: an unfinished run's errors are unknown, so it is not reported as clean.
+    assert "hadErrors" not in result and result["errorsUnavailable"] is True
     assert SCRIPT["action"] not in json.dumps(result)
 
 

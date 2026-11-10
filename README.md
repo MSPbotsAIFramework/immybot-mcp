@@ -229,6 +229,13 @@ uv run pytest
   a run still going when that runs out comes back with `timed_out: true`. The run record also
   carries the script text (`scriptText` / `scriptPreview`); those fields are never copied into
   a tool result.
+- **Script errors are reported next to the status.** ImmyBot keeps a run `Completed` even when
+  the script threw; the errors are a JSON list in `errorsJson` on the per-run record
+  `GET adhoc-script-runs/{id}?createdAt=...` (where ImmyBot's own web app reads them). Both run
+  tools return `hadErrors` and `errors` (the message text) and leave `status` as ImmyBot reports
+  it. If that record cannot be read, or the run timed out before finishing, the result has
+  `errorsUnavailable: true` instead of `hadErrors`, so a run that was not checked is never
+  shown as clean.
 - **Ad hoc scripts** (`immybot_scripts_run_adhoc`) reuse the same `/scripts/run` endpoint and
   `script` / `cancellationId` contract as stored scripts, with `id: 0` marking a body that is not
   in the catalog; the confirmation preview includes a truncated excerpt of the script because
