@@ -2,6 +2,7 @@
   {
     "id": "TC1",
     "ac": "AC1",
+    "dw": "DW1",
     "text": "Given a Recorder stub for scripts/local/2 and adhoc-script-runs/dx whose row carries an error field, When immybot_scripts_run(scriptId=2, computerId=1, confirm=true) is called, Then the result has hadErrors: true, errors containing the stubbed error text, and status == \"Completed\" (unchanged).",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
@@ -11,6 +12,7 @@
   {
     "id": "TC2",
     "ac": "AC1",
+    "dw": "DW1",
     "text": "Given SOP 263, computer DEV-W11-01 (computerId=1), stored Local script 2 (\"MSPbots test - error\"), When an agent calls immybot_scripts_run(scriptId=2, computerId=1, confirm=true) against the live mspbotsai.immy.bot instance, Then the response contains hadErrors: true and errors containing the text TEST-VPN-FAIL simulated error (or the literal text the live record carries).",
     "type": "manual",
     "steps": [
@@ -25,6 +27,7 @@
   {
     "id": "TC3",
     "ac": "AC2",
+    "dw": "DW2",
     "text": "Given the existing clean-run Recorder stub (no error field) for scripts/local/31 and adhoc-script-runs/dx, When immybot_scripts_run is called with confirm=true, Then the result has hadErrors: false and no errors key.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_needs_confirm_and_replays_script"],
@@ -34,6 +37,7 @@
   {
     "id": "TC4",
     "ac": "AC2",
+    "dw": "DW2",
     "text": "Given SOP 263, stored Local script 1 (\"MSPbots VPN stand-in (test)\"), When immybot_scripts_run is called against the live instance with confirm=true, Then the response contains hadErrors: false and no errors key.",
     "type": "manual",
     "steps": [
@@ -48,6 +52,7 @@
   {
     "id": "TC5",
     "ac": "AC3",
+    "dw": "DW1",
     "text": "Given the same error-row stub as TC1, When the result is inspected, Then status is exactly the vendor's own terminal status string (Completed), never replaced by Failed or any other derived value.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
@@ -57,6 +62,7 @@
   {
     "id": "TC6",
     "ac": "AC4",
+    "dw": "DW1",
     "text": "Given the same stub as TC1, When the request log/recorder is inspected, Then no additional HTTP call beyond the existing scripts/run POST and adhoc-script-runs/dx polling GETs was made to obtain the error text.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
@@ -66,10 +72,27 @@
   {
     "id": "TC7",
     "ac": "AC2",
+    "dw": "DW1",
     "text": "Given the error-row stub (TC1), which also carries scriptText/scriptPreview, When the result is inspected, Then neither the script's action text nor scriptText/scriptPreview appears anywhere in the result (regression guard for PRD-21665's AC2).",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_script_run_reports_errors_from_run_record"],
     "result": "pass",
     "evidence": "uv run pytest -q tests/test_api_client.py -k script_run -v -> 6 passed (2026-11-05, code @ 2b33dd9); test asserts SCRIPT[\"action\"] not in json.dumps(result)"
+  },
+  {
+    "id": "TC8",
+    "ac": "AC1",
+    "dw": "DW1",
+    "text": "Given the real ImmyBot run add42035-7795-46ac-b529-2c8591f23d22 on DEV-W11-01 (script 2, computerId=1), which QA-NIGHT confirmed is a real thrown-exception run that still returned hadErrors: false, When immybot_scripts_run(scriptId=2, computerId=1, confirm=true) is called again against the live mspbotsai.immy.bot instance after a fix, Then the response contains hadErrors: true and errors containing the thrown exception text, using a field confirmed from a live row or the instance's own swagger schema -- not another untested addition to the candidate whitelist.",
+    "type": "manual",
+    "steps": [
+      "Obtain ImmyBot credentials for the mspbotsai.immy.bot instance (tenant 1, SOP 263)",
+      "Run Local script 2 (\"MSPbots test - error\") on computer 1 (DEV-W11-01) via immybot_scripts_run(scriptId=2, computerId=1, runAs=System, timeout=90, confirm=true)",
+      "If hadErrors is still false, pull the raw adhoc-script-runs/dx row for that run (or GET /swagger/v1/swagger.json) to identify the real field carrying the error text, and update the detection logic in scripts.py to read it",
+      "Re-run the same call and confirm hadErrors: true and errors contains the thrown text"
+    ],
+    "expect": "hadErrors: true; errors contains the exception text; status stays the vendor's own terminal value (e.g. Completed)",
+    "result": "fail",
+    "evidence": "Rework feedback: comment 1600390000061190 (QA-NIGHT FAIL on INT, QA run #297, 6/7, 2026-11-10) -- live run add42035-7795-46ac-b529-2c8591f23d22 on DEV-W11-01 returned {\"status\":\"Completed\",\"output\":[\"TEST-ERR DEV-W11-01\"],\"hadErrors\":false} with no errors key, confirming none of _ERROR_FIELDS (error, errorOutput, exceptionMessage, exception) matched ImmyBot's real field on this live instance; deployed code was main @ ce150a2 (merged from dev/PRD-21798)"
   }
 ]
