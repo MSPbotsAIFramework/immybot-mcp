@@ -51,7 +51,7 @@ None. Checked round-1 Fixes against `git diff 095776c...a02bb77` (docs-only: `do
 
 Round 2 is approved with 3 open suggestions (2-4 from round 1, unresolved, non-blocking).
 
-## Round 3 · 2026-11-10 · reviewed dev/PRD-21798 @ d098788 (base main @ ce150a2)
+## Round 3 · 2026-11-10 · reviewed d098788 (base ce150a2) · dev/PRD-21798
 
 Verdict: approved
 
