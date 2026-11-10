@@ -149,7 +149,7 @@ async def _await_run(client: ImmyBotClient, computerId: int, scriptId: int | Non
         if attempt + 1 == polls or time.monotonic() >= deadline:
             break
         await asyncio.sleep(_RUN_POLL_SECONDS)
-    return _run_result(running, "Running", []) | {"timed_out": True}
+    return _run_result(running, "Running") | {"timed_out": True}
 
 
 def _matches(row: dict, category: str | None, language: str | None) -> bool:

@@ -233,8 +233,9 @@ uv run pytest
   the script threw; the errors are a JSON list in `errorsJson` on the per-run record
   `GET adhoc-script-runs/{id}?createdAt=...` (where ImmyBot's own web app reads them). Both run
   tools return `hadErrors` and `errors` (the message text) and leave `status` as ImmyBot reports
-  it. If that record cannot be read, the result has `errorsUnavailable: true` instead of
-  `hadErrors`, so a run that was not checked is never shown as clean.
+  it. If that record cannot be read, or the run timed out before finishing, the result has
+  `errorsUnavailable: true` instead of `hadErrors`, so a run that was not checked is never
+  shown as clean.
 - **Ad hoc scripts** (`immybot_scripts_run_adhoc`) reuse the same `/scripts/run` endpoint and
   `script` / `cancellationId` contract as stored scripts, with `id: 0` marking a body that is not
   in the catalog; the confirmation preview includes a truncated excerpt of the script because

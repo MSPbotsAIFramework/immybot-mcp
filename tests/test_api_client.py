@@ -712,6 +712,8 @@ async def test_script_run_reports_a_run_that_never_finishes(monkeypatch):
     rec = Recorder({"scripts/local/31": SCRIPT, "POST scripts/run": lambda r: httpx.Response(202), "adhoc-script-runs/dx": runs(status=1)})
     result = await _call(monkeypatch, rec, "immybot_scripts_run", {"scriptId": 31, "computerId": 7, "timeout": 1, "confirm": True})
     assert result["done"] is True and result["timed_out"] is True and result["status"] == "Running"
+    # PRD-21798 r2: an unfinished run's errors are unknown, so it is not reported as clean.
+    assert "hadErrors" not in result and result["errorsUnavailable"] is True
     assert SCRIPT["action"] not in json.dumps(result)
 
 
