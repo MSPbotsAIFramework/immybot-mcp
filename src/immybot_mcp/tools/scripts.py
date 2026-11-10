@@ -22,7 +22,7 @@ from typing import Annotated, Any, Literal
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-from ..api_client import ImmyBotClient
+from ..api_client import ImmyBotClient, ImmyBotError
 from ._common import (
     DEFAULT,
     DESTRUCTIVE,
@@ -63,11 +63,12 @@ _RUN_FIELDS = (
 # ad hoc run record, which is polled below until the run reaches a terminal status.
 _RUN_STATUS = ("Pending", "Running", "Completed", "Failed", "Cancelled", "TimedOut", "Aborted")
 _RUN_PENDING = ("Pending", "Running")
-# ImmyBot keeps status terminal (e.g. "Completed") even when the script threw; the error/exception
-# text is recorded separately on the same row under one of these candidate keys. No OpenAPI schema
-# for this row is available (see PRD-21798 Open questions); this is an explicit, flagged assumption
-# to be confirmed or corrected against a live instance.
-_ERROR_FIELDS = ("error", "errorOutput", "exceptionMessage", "exception")
+# ImmyBot keeps status terminal (e.g. "Completed") even when the script threw; the errors are a
+# JSON-encoded list in errorsJson on the per-run record GET adhoc-script-runs/{id}?createdAt=...,
+# which is where ImmyBot's own web app reads them (AdhocScriptRunDetailPanel). The /dx grid row
+# need not carry that field, so it is only used when present there (PRD-21798 r2).
+_ERRORS_FIELD = "errorsJson"
+_MESSAGE_KEYS = ("message", "Message", "Exception", "exception")
 _RUN_POLL_SECONDS = 2.0
 _RUN_SORT = json.dumps([{"selector": "createdAt", "desc": True}])
 
@@ -81,32 +82,53 @@ async def _run_page(client: ImmyBotClient, computerId: int) -> list[dict]:
     return [row for row in (rows or []) if isinstance(row, dict)]
 
 
-def _run_errors(row: dict) -> list[str]:
-    """First non-empty candidate error field on the row, as a list of strings. [] if none carry one."""
-    for key in _ERROR_FIELDS:
-        value = row.get(key)
-        if isinstance(value, list):
-            value = [str(item) for item in value if item not in (None, "")]
-            if value:
-                return value
-        elif value not in (None, ""):
-            return [str(value)]
-    return []
+def _error_text(item: Any) -> str:
+    """Readable text of one error entry: its (nested) message when it has one, else the entry as JSON."""
+    while isinstance(item, dict):
+        key = next((k for k in _MESSAGE_KEYS if item.get(k) not in (None, "")), None)
+        if key is None:
+            return json.dumps(item, default=str)
+        item = item[key]
+    return str(item)
 
 
-def _run_result(row: dict, status: str) -> dict:
-    # Only the run's own outcome. The record also carries scriptText / scriptPreview (the script
-    # body); those are never copied out, so a result can never expose the script.
+def _parse_errors(raw: Any) -> list[str]:
+    """errorsJson as a list of strings, [] when it records no error. Same rule as ImmyBot's web app."""
+    if raw in (None, ""):
+        return []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            return [raw]
+    items = raw if isinstance(raw, list) else [raw]
+    return [_error_text(item) for item in items if item not in (None, "")]
+
+
+async def _run_errors(client: ImmyBotClient, row: dict) -> list[str] | None:
+    """The run's errors; None when they could not be read (never reported as a clean run)."""
+    if _ERRORS_FIELD in row:
+        return _parse_errors(row[_ERRORS_FIELD])
+    if not row.get("id"):
+        return None
+    try:
+        detail = await client.get(f"adhoc-script-runs/{row['id']}", compact({"createdAt": row.get("createdAt")}))
+    except ImmyBotError:
+        return None
+    return _parse_errors(detail.get(_ERRORS_FIELD)) if isinstance(detail, dict) else None
+
+
+def _run_result(row: dict, status: str, errors: list[str] | None = None) -> dict:
+    # Only the run's own outcome. The record also carries scriptText / scriptPreview / consoleText
+    # (the script body and its transcript); those are never copied out, so a result can never expose the script.
     output = row.get("output")
     if isinstance(output, str):
         try:
             output = json.loads(output)
         except ValueError:
             pass
-    errors = _run_errors(row)
-    return compact(
-        {"status": status, "output": output, "duration_ms": row.get("durationMs"), "hadErrors": bool(errors), "errors": errors or None}
-    )
+    checked = {"hadErrors": bool(errors), "errors": errors or None} if errors is not None else {"errorsUnavailable": True}
+    return compact({"status": status, "output": output, "duration_ms": row.get("durationMs")} | checked)
 
 
 async def _await_run(client: ImmyBotClient, computerId: int, scriptId: int | None, seen: set, budget: float) -> dict:
@@ -121,13 +143,13 @@ async def _await_run(client: ImmyBotClient, computerId: int, scriptId: int | Non
                 continue
             status = str(enum_name(row.get("status"), _RUN_STATUS))
             if status not in _RUN_PENDING:
-                return _run_result(row, status)
+                return _run_result(row, status, await _run_errors(client, row))
             running = row
             break
         if attempt + 1 == polls or time.monotonic() >= deadline:
             break
         await asyncio.sleep(_RUN_POLL_SECONDS)
-    return _run_result(running, "Running") | {"timed_out": True}
+    return _run_result(running, "Running", []) | {"timed_out": True}
 
 
 def _matches(row: dict, category: str | None, language: str | None) -> bool:
